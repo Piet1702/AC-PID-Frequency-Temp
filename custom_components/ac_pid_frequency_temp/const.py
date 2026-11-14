@@ -28,12 +28,14 @@ MODE_FREQUENCY = "frequency"
 MODE_ROOM_OBSERVE = "room_observe"
 MODE_ROOM_AUTO = "room_auto"
 CONF_ROOM_MAX_HZ = "room_max_hz"
+CONF_ROOM_MIN_HZ_GUARD = "room_min_hz_guard_minutes"
 CONF_ROOM_TARGET = "room_target_temp"
 CONF_PREFERRED_HZ = "room_preferred_hz"
 CONF_ROOM_OVERHEAT_DELTA = "room_overheat_delta_k"
 CONF_ROOM_RESTART_DELTA = "room_restart_delta_k"
 CONF_ROOM_OBSERVE_WINDOW = "room_observe_window_min"
 ROOM_DEFAULTS = {
+    CONF_ROOM_MIN_HZ_GUARD: 0.0,  # 0 = deaktiviert, erst nach HA-Praxistest aktivieren
     CONF_CONTROL_MODE: MODE_FREQUENCY,
     CONF_ROOM_TARGET: 21.0,
     CONF_PREFERRED_HZ: 22.0,

@@ -199,6 +199,17 @@
       },
       "room_auto_status": {
         "name": "Adaptive Raumregelung – Status"
+      },
+      "room_continuity": {
+        "name": "Dauerbetrieb und 20-Hz-Schutz",
+        "state": {
+          "inactive": "Inaktiv",
+          "guard_active": "Schutz greift ein",
+          "temperature_limit": "Temperaturgrenze",
+          "paused": "Pausiert",
+          "guard_disabled": "Schutz deaktiviert",
+          "monitoring": "Überwachung"
+        }
       }
     },
     "number": {
@@ -228,6 +239,9 @@
       },
       "room_max_hz": {
         "name": "Maximale automatische Ziel-Hz"
+      },
+      "room_min_hz_guard": {
+        "name": "20-Hz-Schutz nach Minuten (0 = aus)"
       }
     },
     "switch": {

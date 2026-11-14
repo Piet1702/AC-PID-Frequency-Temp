@@ -52,6 +52,7 @@ async def async_setup_entry(
             RoomAdviceSensor(controller),
             RoomMinHzDurationSensor(controller),
             RoomAutoStatusSensor(controller),
+            RoomContinuitySensor(controller),
             MqttStatusSensor(controller),
             MqttLastPublishSensor(controller),
             RoomSensorStatusSensor(controller),
@@ -414,4 +415,46 @@ class RoomAutoStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "writes_mqtt_power": False,
             "actual_room_temperature": self.controller.room_observer.snapshot.room_temp,
             "temperature_trend_c_per_h": self.controller.room_observer.snapshot.trend_kph,
+        }
+
+
+class RoomContinuitySensor(AcPidFrequencyEntity, SensorEntity):
+    """Details zur 20-Hz-Schutzlogik und zum gelernten Heizbedarf."""
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:chart-timeline-variant-shimmer"
+
+    def __init__(self, controller):
+        super().__init__(controller, "room_continuity")
+
+    @property
+    def native_value(self) -> str:
+        from .const import CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD
+        cfg = self.controller.config
+        if cfg[CONF_CONTROL_MODE] != MODE_ROOM_AUTO or not self.controller.enabled:
+            return "inactive"
+        if self.controller.room_auto.decision.state == "min_modulation_guard":
+            return "guard_active"
+        if self.controller.room_auto.decision.heat_suppressed:
+            return "temperature_limit"
+        if self.controller.room_auto.decision.state in ("paused", "fault"):
+            return "paused"
+        if float(cfg[CONF_ROOM_MIN_HZ_GUARD]) <= 0:
+            return "guard_disabled"
+        return "monitoring"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        from .const import CONF_ROOM_MIN_HZ_GUARD
+        ctrl = self.controller.room_auto
+        return {
+            "minutes_at_measured_20_hz": ctrl.latest_min_duration,
+            "guard_threshold_minutes": self.controller.config[CONF_ROOM_MIN_HZ_GUARD],
+            "outdoor_zone": ctrl.latest_zone,
+            "learned_hz_in_zone": ctrl.continuity.learned_hz(None if ctrl.latest_zone == "unknown" else
+                (-1 if ctrl.latest_zone == "frost" else (6 if ctrl.latest_zone == "transition" else 15))),
+            "learned_zones": ctrl.continuity.export(),
+            "learning_updated_this_tick": ctrl.last_learned,
+            "calculated_target_hz": ctrl.decision.target_hz,
+            "reason": ctrl.decision.reason,
+            "mqtt_power_commands": False,
         }

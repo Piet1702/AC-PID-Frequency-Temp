@@ -73,6 +73,7 @@ from .const import (
     CONF_PREFERRED_HZ, CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA,
     CONF_ROOM_OBSERVE_WINDOW, CONF_ROOM_STALE, MQTT_DEFAULTS,
     MODE_ROOM_AUTO, CONF_ROOM_MAX_HZ, CONF_MAX_OFFSET, STATUS_ROOM_HEAT_PAUSE,
+    CONF_ROOM_MIN_HZ_GUARD,
 )
 from .protoart_mqtt import ProtoArtMqttBridge
 
@@ -160,6 +161,7 @@ class AcPidFrequencyController:
             self.target_hz = min(max(target, TARGET_HZ_MIN), TARGET_HZ_MAX)
         self.regelung.output = output
         self.regelung.load_learned_data(data)
+        self.room_auto.continuity.load(data.get("room_continuity_learning"))
 
     @callback
     def async_start(self) -> None:
@@ -210,6 +212,7 @@ class AcPidFrequencyController:
             "target_hz": self.target_hz,
             "output": self.regelung.output,
             **self.regelung.export_learned_data(),
+            "room_continuity_learning": self.room_auto.continuity.export(),
         }
 
     # ------------------------------------------------------------------ Bedienung
@@ -229,6 +232,7 @@ class AcPidFrequencyController:
     def async_reset_learning(self) -> None:
         """Setzt die gelernte Arbeitspunkt-Tabelle und Anlageneigenschaften auf Werkseinstellungen zurück."""
         self.regelung.reset_learning()
+        self.room_auto.continuity.reset_all()
         self._publish()
 
     @callback
@@ -295,6 +299,13 @@ class AcPidFrequencyController:
         if cfg[CONF_CONTROL_MODE] != MODE_ROOM_AUTO:
             self.room_auto.reset()
             return
+        outside = None
+        if cfg.get(CONF_OUTDOOR_TEMP):
+            outside_state = self.hass.states.get(cfg[CONF_OUTDOOR_TEMP])
+            if outside_state is not None:
+                outside = _to_float(outside_state.state)
+                if outside is None:
+                    outside = _to_float(outside_state.attributes.get("temperature"))
         decision = self.room_auto.update(
             now=dt_util.utcnow(), observation=self.room_observer.snapshot,
             running=self.enabled,
@@ -304,6 +315,13 @@ class AcPidFrequencyController:
             max_overheat_k=float(cfg[CONF_ROOM_OVERHEAT_DELTA]),
             restart_delta_k=float(cfg[CONF_ROOM_RESTART_DELTA]),
             observation_window_min=float(cfg[CONF_ROOM_OBSERVE_WINDOW]),
+            actual_hz=(
+                _to_float(freq_state.state)
+                if (freq_state := self.hass.states.get(cfg[CONF_FREQUENCY])) is not None
+                else None
+            ),
+            outdoor_temp=outside,
+            min_hz_guard_minutes=float(cfg[CONF_ROOM_MIN_HZ_GUARD]),
         )
         if self.enabled and decision.target_hz is not None:
             self.target_hz = decision.target_hz

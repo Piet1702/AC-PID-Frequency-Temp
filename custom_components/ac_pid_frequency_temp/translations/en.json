@@ -199,6 +199,17 @@
       },
       "room_auto_status": {
         "name": "Adaptive room control – status"
+      },
+      "room_continuity": {
+        "name": "Continuous heating and 20 Hz guard",
+        "state": {
+          "inactive": "Inactive",
+          "guard_active": "Guard active",
+          "temperature_limit": "Temperature limit",
+          "paused": "Paused",
+          "guard_disabled": "Guard disabled",
+          "monitoring": "Monitoring"
+        }
       }
     },
     "number": {
@@ -228,6 +239,9 @@
       },
       "room_max_hz": {
         "name": "Maximum automatic target Hz"
+      },
+      "room_min_hz_guard": {
+        "name": "20 Hz protection after minutes (0 = off)"
       }
     },
     "switch": {
