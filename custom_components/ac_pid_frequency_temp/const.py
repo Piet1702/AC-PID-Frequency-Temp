@@ -6,7 +6,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "ac_pid_frequency_temp"
 
-PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SWITCH, Platform.BUTTON, Platform.TEXT]
+PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SWITCH, Platform.BUTTON, Platform.TEXT, Platform.SELECT]
 
 # --- Entitäten-Auswahl (Setup + Optionen) -------------------------------------------------
 CONF_NAME = "name"
@@ -22,6 +22,23 @@ CONF_MQTT_INTERVAL = "mqtt_interval_s"
 CONF_MQTT_QOS = "mqtt_qos"
 CONF_MQTT_RETAIN = "mqtt_retain"
 CONF_ROOM_STALE = "room_sensor_stale_s"
+# Neue Raumregelungsoptionen (2.4.1.4: NUR BEOBACHTEN)
+CONF_CONTROL_MODE = "control_mode"
+MODE_FREQUENCY = "frequency"
+MODE_ROOM_OBSERVE = "room_observe"
+CONF_ROOM_TARGET = "room_target_temp"
+CONF_PREFERRED_HZ = "room_preferred_hz"
+CONF_ROOM_OVERHEAT_DELTA = "room_overheat_delta_k"
+CONF_ROOM_RESTART_DELTA = "room_restart_delta_k"
+CONF_ROOM_OBSERVE_WINDOW = "room_observe_window_min"
+ROOM_DEFAULTS = {
+    CONF_CONTROL_MODE: MODE_FREQUENCY,
+    CONF_ROOM_TARGET: 21.0,
+    CONF_PREFERRED_HZ: 22.0,
+    CONF_ROOM_OVERHEAT_DELTA: 2.0,
+    CONF_ROOM_RESTART_DELTA: 0.5,
+    CONF_ROOM_OBSERVE_WINDOW: 30.0,
+}
 MQTT_DEFAULTS = {
     CONF_MQTT_ENABLED: False,
     CONF_MQTT_TOPIC: "",

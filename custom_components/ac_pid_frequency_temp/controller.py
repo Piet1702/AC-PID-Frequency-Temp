@@ -65,6 +65,13 @@ from .const import (
     TUNING_DEFAULTS,
 )
 from .regelung import Params, State, round1, step
+from .room_observer import RoomObserver
+from .protoart_mqtt import room_sensor_snapshot
+from .const import (
+    ROOM_DEFAULTS, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE, CONF_ROOM_TARGET,
+    CONF_PREFERRED_HZ, CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA,
+    CONF_ROOM_OBSERVE_WINDOW, CONF_ROOM_STALE, MQTT_DEFAULTS,
+)
 from .protoart_mqtt import ProtoArtMqttBridge
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,6 +113,7 @@ class AcPidFrequencyController:
         # Regelkern-Zustand (inkl. gelernter Werte)
         self.regelung = State()
         self.mqtt_bridge = ProtoArtMqttBridge(self)
+        self.room_observer = RoomObserver()
 
         # Vom Nutzer einstellbar (per Entität), werden gespeichert
         self.enabled = False
@@ -123,7 +131,7 @@ class AcPidFrequencyController:
     @property
     def config(self) -> dict[str, Any]:
         """Setup-Daten, überschrieben von den Optionen, mit Standardwerten dahinter."""
-        return {**TUNING_DEFAULTS, **MQTT_DEFAULTS, **self.entry.data, **self.entry.options}
+        return {**TUNING_DEFAULTS, **MQTT_DEFAULTS, **ROOM_DEFAULTS, **self.entry.data, **self.entry.options}
 
     @property
     def params(self) -> Params:
@@ -141,6 +149,8 @@ class AcPidFrequencyController:
         """Gespeicherten Zustand laden."""
         data = await self._store.async_load() or {}
         self.enabled = bool(data.get("enabled", False))
+        if self.config[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
+            self.enabled = False  # Im Beobachtungsmodus niemals automatisch Hz regeln
         target = _to_float(data.get("target_hz"))
         output = _to_float(data.get("output"))
         if target is not None:
@@ -246,8 +256,37 @@ class AcPidFrequencyController:
         if self.status in (STATUS_OFF, STATUS_IDLE):
             self._tick()
 
+    def _update_room_observer(self) -> None:
+        """Nur HA-Zustände lesen, die Anlage niemals aktiv steuern."""
+        cfg = self.config
+        room_id = cfg.get(CONF_ROOM_TEMP)
+        sensor_status, sensor_age, report_at = room_sensor_snapshot(
+            self.hass, room_id, float(cfg[CONF_ROOM_STALE])
+        )
+        room_state = self.hass.states.get(room_id) if room_id else None
+        room_temp = (
+            _to_float(room_state.state)
+            if room_state is not None and sensor_status == "ok" else None
+        )
+        climate = self.hass.states.get(cfg[CONF_CLIMATE])
+        heating = climate is not None and climate.state == HVAC_MODE_ACTIVE
+        hz_state = self.hass.states.get(cfg[CONF_FREQUENCY])
+        actual_hz = _to_float(hz_state.state) if hz_state is not None else None
+        self.room_observer.update(
+            now=dt_util.utcnow(), room_temp=room_temp, report_at=report_at,
+            sensor_status=sensor_status, age_seconds=sensor_age,
+            heating=heating, defrost=self._read_defrost(climate),
+            actual_hz=actual_hz,
+            target_temp=float(cfg[CONF_ROOM_TARGET]),
+            preferred_hz=float(cfg[CONF_PREFERRED_HZ]),
+            max_overheat_k=float(cfg[CONF_ROOM_OVERHEAT_DELTA]),
+            restart_delta_k=float(cfg[CONF_ROOM_RESTART_DELTA]),
+            window_min=float(cfg[CONF_ROOM_OBSERVE_WINDOW]),
+        )
+
     @callback
     def _tick(self) -> None:
+        self._update_room_observer()
         self._evaluate()
         self._publish()
 
@@ -261,6 +300,9 @@ class AcPidFrequencyController:
         """Einen Regelschritt rechnen (oder den Fehlerfall behandeln)."""
         cfg = self.config
 
+        if cfg[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
+            self._evaluate_disabled()  # kein Frequenzregler, keine synthetische Heizanforderung
+            return
         if not self.enabled:
             self._evaluate_disabled()
             return

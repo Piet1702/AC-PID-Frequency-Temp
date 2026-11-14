@@ -141,7 +141,8 @@
           "room_invalid": "Invalid room sensor",
           "room_stale": "Stale room sensor",
           "output_unavailable": "Simulated temperature unavailable",
-          "mqtt_error": "MQTT error"
+          "mqtt_error": "MQTT error",
+          "paused_observe": "Paused in observe-only mode"
         }
       },
       "mqtt_last_publish": {
@@ -159,6 +160,41 @@
       },
       "room_sensor_age": {
         "name": "Room sensor age"
+      },
+      "room_observer_phase": {
+        "name": "Room control – observation phase",
+        "state": {
+          "collecting": "Collecting samples",
+          "defrost": "Defrost",
+          "recovery": "Recovery after defrost",
+          "sensor_missing": "Room sensor missing",
+          "sensor_stale": "Room sensor stale",
+          "inactive": "Not heating",
+          "below_restart": "Below restart reference",
+          "approaching": "Approaching target",
+          "tolerance": "Within overshoot tolerance",
+          "above_limit": "Overshoot limit reached"
+        }
+      },
+      "room_temperature_trend": {
+        "name": "Room temperature trend"
+      },
+      "room_target_delta": {
+        "name": "Difference to target room temperature"
+      },
+      "room_observer_advice": {
+        "name": "Room control – advisory only",
+        "state": {
+          "paused": "Paused",
+          "wait_data": "Observe more",
+          "hold": "Hold frequency",
+          "increase_slowly": "Later raise gently",
+          "reduce_slowly": "Later lower gently",
+          "prefer_continuous": "Check low continuous Hz"
+        }
+      },
+      "room_time_at_min_hz": {
+        "name": "Time at 20 Hz"
       }
     },
     "number": {
@@ -170,6 +206,21 @@
       },
       "mqtt_qos": {
         "name": "MQTT QoS"
+      },
+      "room_target": {
+        "name": "Target room temperature"
+      },
+      "room_preferred_hz": {
+        "name": "Preferred continuous compressor frequency"
+      },
+      "room_overheat_delta": {
+        "name": "Allowed temperature overshoot (+K)"
+      },
+      "room_restart_delta": {
+        "name": "Heat demand restart reference (−K)"
+      },
+      "room_observation_window": {
+        "name": "Observation window"
       }
     },
     "switch": {
@@ -194,6 +245,15 @@
     "text": {
       "mqtt_topic": {
         "name": "MQTT topic"
+      }
+    },
+    "select": {
+      "control_mode": {
+        "name": "Control mode",
+        "state": {
+          "frequency": "Frequency control",
+          "room_observe": "Room temperature (observe only)"
+        }
       }
     }
   }

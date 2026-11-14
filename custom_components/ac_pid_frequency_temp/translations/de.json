@@ -141,7 +141,8 @@
           "room_invalid": "Raumsensor ungültig",
           "room_stale": "Raumsensor veraltet",
           "output_unavailable": "Berechneter Temperaturwert fehlt",
-          "mqtt_error": "MQTT-Fehler"
+          "mqtt_error": "MQTT-Fehler",
+          "paused_observe": "Pausiert im Beobachtungsmodus"
         }
       },
       "mqtt_last_publish": {
@@ -159,6 +160,41 @@
       },
       "room_sensor_age": {
         "name": "Raumsensor-Alter"
+      },
+      "room_observer_phase": {
+        "name": "Raumregelung – Beobachtungsphase",
+        "state": {
+          "collecting": "Messwerte sammeln",
+          "defrost": "Abtauung",
+          "recovery": "Erholung nach Abtauung",
+          "sensor_missing": "Raumsensor fehlt",
+          "sensor_stale": "Raumsensor veraltet",
+          "inactive": "Kein Heizbetrieb",
+          "below_restart": "Unter Wiedereinschalt-Referenz",
+          "approaching": "Annäherung ans Ziel",
+          "tolerance": "Innerhalb Überheizungstoleranz",
+          "above_limit": "Überheizungsgrenze erreicht"
+        }
+      },
+      "room_temperature_trend": {
+        "name": "Raumtemperaturtrend"
+      },
+      "room_target_delta": {
+        "name": "Abstand zur Ziel-Raumtemperatur"
+      },
+      "room_observer_advice": {
+        "name": "Raumregelung – unverbindliche Empfehlung",
+        "state": {
+          "paused": "Pausiert",
+          "wait_data": "Weiter beobachten",
+          "hold": "Frequenz beibehalten",
+          "increase_slowly": "Später behutsam erhöhen",
+          "reduce_slowly": "Später behutsam reduzieren",
+          "prefer_continuous": "Niedrige Dauerbetriebs-Hz prüfen"
+        }
+      },
+      "room_time_at_min_hz": {
+        "name": "Zeit bei 20 Hz"
       }
     },
     "number": {
@@ -170,6 +206,21 @@
       },
       "mqtt_qos": {
         "name": "MQTT QoS"
+      },
+      "room_target": {
+        "name": "Ziel-Raumtemperatur"
+      },
+      "room_preferred_hz": {
+        "name": "Bevorzugte Dauerbetriebsfrequenz"
+      },
+      "room_overheat_delta": {
+        "name": "Erlaubte Überheizung (+K)"
+      },
+      "room_restart_delta": {
+        "name": "Referenz für erneute Wärmeanforderung (−K)"
+      },
+      "room_observation_window": {
+        "name": "Beobachtungsfenster"
       }
     },
     "switch": {
@@ -194,6 +245,15 @@
     "text": {
       "mqtt_topic": {
         "name": "MQTT-Topic"
+      }
+    },
+    "select": {
+      "control_mode": {
+        "name": "Regelmodus",
+        "state": {
+          "frequency": "Frequenzregelung",
+          "room_observe": "Raumtemperatur (nur beobachten)"
+        }
       }
     }
   }

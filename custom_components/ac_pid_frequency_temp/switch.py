@@ -8,7 +8,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import CONF_MQTT_ENABLED, CONF_MQTT_RETAIN, CONF_MQTT_TOPIC, CONF_ROOM_TEMP
+from .const import CONF_MQTT_ENABLED, CONF_MQTT_RETAIN, CONF_MQTT_TOPIC, CONF_ROOM_TEMP, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE
 from .protoart_mqtt import valid_publish_topic
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -37,6 +37,8 @@ class EnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
         return self.controller.enabled
 
     async def async_turn_on(self, **kwargs: Any) -> None:
+        if self.controller.config[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
+            raise HomeAssistantError("Im Raum-Beobachtungsmodus ist die Hz-Regelung gesperrt.")
         self.controller.async_set_enabled(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:

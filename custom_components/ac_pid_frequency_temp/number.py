@@ -5,7 +5,10 @@ from __future__ import annotations
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
-from .const import CONF_MQTT_INTERVAL, CONF_MQTT_QOS
+from .const import (
+    CONF_MQTT_INTERVAL, CONF_MQTT_QOS, CONF_ROOM_TARGET, CONF_PREFERRED_HZ,
+    CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA, CONF_ROOM_OBSERVE_WINDOW,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfFrequency
 from homeassistant.core import HomeAssistant
@@ -20,7 +23,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: AcPidFrequencyController = entry.runtime_data
-    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller)])
+    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller)])
 
 
 class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
@@ -96,3 +99,83 @@ class MqttQosNumber(AcPidFrequencyEntity, NumberEntity):
             self.controller.entry,
             options={**self.controller.entry.options, CONF_MQTT_QOS: int(value)},
         )
+
+
+class RoomConfigNumber(AcPidFrequencyEntity, NumberEntity):
+    """Numerische Raumregel-Option; gespeichert in HA ConfigEntry.options."""
+
+    option_key: str
+    _attr_mode = NumberMode.BOX
+
+    def __init__(self, controller: AcPidFrequencyController, key: str) -> None:
+        super().__init__(controller, key)
+
+    @property
+    def native_value(self) -> float:
+        return float(self.controller.config[self.option_key])
+
+    async def async_set_native_value(self, value: float) -> None:
+        if not (self._attr_native_min_value <= value <= self._attr_native_max_value):
+            raise HomeAssistantError("Wert außerhalb des zulässigen Bereichs.")
+        delta = (float(value) - self._attr_native_min_value) / self._attr_native_step
+        if abs(delta - round(delta)) > 0.00001:
+            raise HomeAssistantError("Ungültige Schrittweite.")
+        self.hass.config_entries.async_update_entry(
+            self.controller.entry,
+            options={**self.controller.entry.options, self.option_key: float(value)},
+        )
+
+
+class RoomTargetNumber(RoomConfigNumber):
+    option_key = CONF_ROOM_TARGET
+    _attr_icon = "mdi:thermometer"
+    _attr_native_unit_of_measurement = "°C"
+    _attr_native_min_value = 16
+    _attr_native_max_value = 30
+    _attr_native_step = 0.1
+    def __init__(self, controller):
+        super().__init__(controller, "room_target")
+
+
+class RoomPreferredHzNumber(RoomConfigNumber):
+    option_key = CONF_PREFERRED_HZ
+    _attr_icon = "mdi:sine-wave"
+    _attr_native_unit_of_measurement = "Hz"
+    _attr_native_min_value = 20
+    _attr_native_max_value = 60
+    _attr_native_step = 1
+    def __init__(self, controller):
+        super().__init__(controller, "room_preferred_hz")
+
+
+class RoomOverheatNumber(RoomConfigNumber):
+    option_key = CONF_ROOM_OVERHEAT_DELTA
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_unit_of_measurement = "K"
+    _attr_native_min_value = 0.2
+    _attr_native_max_value = 3.0
+    _attr_native_step = 0.1
+    def __init__(self, controller):
+        super().__init__(controller, "room_overheat_delta")
+
+
+class RoomRestartDeltaNumber(RoomConfigNumber):
+    option_key = CONF_ROOM_RESTART_DELTA
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_unit_of_measurement = "K"
+    _attr_native_min_value = 0.1
+    _attr_native_max_value = 2.0
+    _attr_native_step = 0.1
+    def __init__(self, controller):
+        super().__init__(controller, "room_restart_delta")
+
+
+class RoomWindowNumber(RoomConfigNumber):
+    option_key = CONF_ROOM_OBSERVE_WINDOW
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_unit_of_measurement = "min"
+    _attr_native_min_value = 15
+    _attr_native_max_value = 60
+    _attr_native_step = 5
+    def __init__(self, controller):
+        super().__init__(controller, "room_observation_window")

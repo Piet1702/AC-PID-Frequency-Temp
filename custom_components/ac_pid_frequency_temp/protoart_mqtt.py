@@ -25,6 +25,7 @@ from .const import (
     CONF_ROOM_TEMP,
     CONF_ROOM_STALE,
     MQTT_DEFAULTS,
+    CONF_CONTROL_MODE, MODE_ROOM_OBSERVE,
 )
 
 if TYPE_CHECKING:
@@ -110,6 +111,9 @@ class ProtoArtMqttBridge:
             if self._stopped:
                 return
             cfg = self.controller.config
+            if cfg[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
+                self._set_state("paused_observe")
+                return
             if not self.enabled:
                 self._set_state("disabled")
                 return

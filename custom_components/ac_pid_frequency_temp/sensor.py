@@ -28,6 +28,8 @@ from .const import (
     STATUSES,
 )
 from .controller import AcPidFrequencyController
+from .const import (CONF_ROOM_TARGET, CONF_ROOM_OVERHEAT_DELTA,
+                    CONF_ROOM_RESTART_DELTA, CONF_PREFERRED_HZ)
 from .entity import AcPidFrequencyEntity
 from .protoart_mqtt import room_sensor_snapshot
 
@@ -44,6 +46,11 @@ async def async_setup_entry(
             FactorSensor(controller),
             ErrorSensor(controller),
             MinHzSensor(controller),
+            RoomObservationPhaseSensor(controller),
+            RoomTrendSensor(controller),
+            RoomDeltaSensor(controller),
+            RoomAdviceSensor(controller),
+            RoomMinHzDurationSensor(controller),
             MqttStatusSensor(controller),
             MqttLastPublishSensor(controller),
             RoomSensorStatusSensor(controller),
@@ -202,7 +209,7 @@ class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
     _attr_options = [
         "disabled", "sent", "invalid_topic", "room_not_configured",
         "room_missing", "room_invalid", "room_stale",
-        "output_unavailable", "mqtt_error",
+        "output_unavailable", "mqtt_error", "paused_observe",
     ]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:message-arrow-right"
@@ -294,3 +301,92 @@ class RoomSensorAgeSensor(AcPidFrequencyEntity, SensorEntity):
             float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
         )
         return round(age, 1) if age is not None else None
+
+
+class RoomObservationPhaseSensor(AcPidFrequencyEntity, SensorEntity):
+    """Beobachtungsstatus; ausdrücklich keine automatische Temperaturregelung."""
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [
+        "collecting", "defrost", "recovery", "sensor_missing", "sensor_stale",
+        "inactive", "below_restart", "approaching", "tolerance", "above_limit",
+    ]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:chart-timeline-variant"
+    def __init__(self, controller):
+        super().__init__(controller, "room_observer_phase")
+    @property
+    def native_value(self) -> str:
+        return self.controller.room_observer.snapshot.phase
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        m = self.controller.room_observer.snapshot
+        cfg = self.controller.config
+        return {
+            "reason": m.reason,
+            "advice": m.advice,
+            "observed_room_temperature": m.room_temp,
+            "target_room_temperature": cfg.get(CONF_ROOM_TARGET),
+            "upper_tolerance_temperature": round(cfg[CONF_ROOM_TARGET] + cfg[CONF_ROOM_OVERHEAT_DELTA], 2),
+            "restart_reference_temperature": round(cfg[CONF_ROOM_TARGET] - cfg[CONF_ROOM_RESTART_DELTA], 2),
+            "preferred_continuous_hz": cfg[CONF_PREFERRED_HZ],
+            "physical_minimum_hz_assumed": 20,
+            "observed_window_minutes": m.window_minutes,
+            "sample_count": m.samples,
+            "sensor_age_seconds": m.input_age_seconds,
+            "recovery_seconds_remaining": m.recovery_seconds,
+            "observation_only": True,
+            "writes_target_hz": False,
+            "writes_mqtt_power": False,
+        }
+
+
+class RoomTrendSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_native_unit_of_measurement = "°C/h"
+    _attr_suggested_display_precision = 3
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:trending-up"
+    def __init__(self, controller):
+        super().__init__(controller, "room_temperature_trend")
+    @property
+    def native_value(self) -> float | None:
+        return self.controller.room_observer.snapshot.trend_kph
+
+
+class RoomDeltaSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_native_unit_of_measurement = "K"
+    _attr_suggested_display_precision = 2
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    def __init__(self, controller):
+        super().__init__(controller, "room_target_delta")
+    @property
+    def native_value(self) -> float | None:
+        return self.controller.room_observer.snapshot.delta_k
+
+
+class RoomAdviceSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [
+        "paused", "wait_data", "hold", "increase_slowly", "reduce_slowly",
+        "prefer_continuous",
+    ]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    def __init__(self, controller):
+        super().__init__(controller, "room_observer_advice")
+    @property
+    def native_value(self) -> str:
+        return self.controller.room_observer.snapshot.advice
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"reason": self.controller.room_observer.snapshot.reason,
+                "is_simulation": True, "writes_to_heatpump": False}
+
+
+class RoomMinHzDurationSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_native_unit_of_measurement = "min"
+    _attr_suggested_display_precision = 1
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    def __init__(self, controller):
+        super().__init__(controller, "room_time_at_min_hz")
+    @property
+    def native_value(self) -> float:
+        return self.controller.room_observer.snapshot.minutes_at_min_hz
