@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, UnitOfFrequency, UnitOfTemperature
+from homeassistant.const import EntityCategory, UnitOfFrequency, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -22,11 +22,14 @@ from .const import (
     CONF_INDOOR_UNITS,
     CONF_OUTDOOR_TEMP,
     CONF_ROOM_TEMP,
+    CONF_ROOM_STALE,
+    MQTT_DEFAULTS,
     DOMAIN,
     STATUSES,
 )
 from .controller import AcPidFrequencyController
 from .entity import AcPidFrequencyEntity
+from .protoart_mqtt import room_sensor_snapshot
 
 
 async def async_setup_entry(
@@ -41,6 +44,10 @@ async def async_setup_entry(
             FactorSensor(controller),
             ErrorSensor(controller),
             MinHzSensor(controller),
+            MqttStatusSensor(controller),
+            MqttLastPublishSensor(controller),
+            RoomSensorStatusSensor(controller),
+            RoomSensorAgeSensor(controller),
         ]
     )
 
@@ -186,3 +193,104 @@ class MinHzSensor(AcPidFrequencyEntity, SensorEntity):
     @property
     def native_value(self) -> float:
         return self.controller.regelung.learned_min_hz
+
+
+class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
+    """HA-seitiger Veröffentlichungsstatus (keine ProtoART-Empfangsbestätigung)."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [
+        "disabled", "sent", "invalid_topic", "room_not_configured",
+        "room_missing", "room_invalid", "room_stale",
+        "output_unavailable", "mqtt_error",
+    ]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:message-arrow-right"
+
+    def __init__(self, controller: AcPidFrequencyController) -> None:
+        super().__init__(controller, "mqtt_status")
+
+    @property
+    def native_value(self) -> str:
+        return self.controller.mqtt_bridge.state
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        bridge = self.controller.mqtt_bridge
+        cfg = self.controller.config
+        return {
+            "topic": cfg.get("mqtt_topic"),
+            "send_interval_s": cfg.get("mqtt_interval_s"),
+            "publish_count": bridge.publish_count,
+            "last_payload": bridge.last_payload,
+            "last_error": bridge.last_error,
+            "last_publish_utc": bridge.last_success.isoformat() if bridge.last_success else None,
+            "qos": cfg.get("mqtt_qos"),
+            "retain": cfg.get("mqtt_retain"),
+            "note": "sent = vom HA-MQTT-Client akzeptiert; keine Empfangsbestätigung des Geräts",
+        }
+
+
+class MqttLastPublishSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:clock-check-outline"
+
+    def __init__(self, controller: AcPidFrequencyController) -> None:
+        super().__init__(controller, "mqtt_last_publish")
+
+    @property
+    def native_value(self):
+        return self.controller.mqtt_bridge.last_success
+
+
+class RoomSensorStatusSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["not_configured", "missing", "invalid", "stale", "ok"]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:bluetooth-connect"
+
+    def __init__(self, controller: AcPidFrequencyController) -> None:
+        super().__init__(controller, "room_sensor_status")
+
+    def _snapshot(self):
+        cfg = self.controller.config
+        return room_sensor_snapshot(
+            self.controller.hass, cfg.get(CONF_ROOM_TEMP),
+            float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
+        )
+
+    @property
+    def native_value(self) -> str:
+        return self._snapshot()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        status, age, last_report = self._snapshot()
+        cfg = self.controller.config
+        return {
+            "source_entity": cfg.get(CONF_ROOM_TEMP),
+            "age_seconds": round(age, 1) if age is not None else None,
+            "last_reported_utc": last_report.isoformat() if last_report else None,
+            "stale_after_seconds": cfg.get(CONF_ROOM_STALE),
+            "status": status,
+        }
+
+
+class RoomSensorAgeSensor(AcPidFrequencyEntity, SensorEntity):
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_suggested_display_precision = 0
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:timer-outline"
+
+    def __init__(self, controller: AcPidFrequencyController) -> None:
+        super().__init__(controller, "room_sensor_age")
+
+    @property
+    def native_value(self) -> float | None:
+        cfg = self.controller.config
+        _, age, _ = room_sensor_snapshot(
+            self.controller.hass, cfg.get(CONF_ROOM_TEMP),
+            float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
+        )
+        return round(age, 1) if age is not None else None

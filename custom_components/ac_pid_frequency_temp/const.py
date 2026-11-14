@@ -16,6 +16,20 @@ CONF_OUTDOOR_TEMP = "outdoor_temp_entity"  # Außentemperatur (optional: sensor 
 CONF_ROOM_TEMP = "room_temp_entity"  # Echter Raumtemperatursensor (optional)
 CONF_DEFROST = "defrost_entity"  # Abtau-Sensor (optional: binary_sensor oder sensor)
 CONF_INDOOR_UNITS = "indoor_units"  # weitere Innengeräte (nur Anzeige)
+CONF_MQTT_ENABLED = "mqtt_enabled"
+CONF_MQTT_TOPIC = "mqtt_topic"
+CONF_MQTT_INTERVAL = "mqtt_interval_s"
+CONF_MQTT_QOS = "mqtt_qos"
+CONF_MQTT_RETAIN = "mqtt_retain"
+CONF_ROOM_STALE = "room_sensor_stale_s"
+MQTT_DEFAULTS = {
+    CONF_MQTT_ENABLED: False,
+    CONF_MQTT_TOPIC: "",
+    CONF_MQTT_INTERVAL: 5,
+    CONF_MQTT_QOS: 0,
+    CONF_MQTT_RETAIN: False,
+    CONF_ROOM_STALE: 300,
+}
 
 # --- Regel-Parameter (auf das absolut notwendige Minimum reduziert) -----------------------
 CONF_INTERVAL = "interval_s"

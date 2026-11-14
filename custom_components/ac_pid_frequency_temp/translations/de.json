@@ -33,7 +33,8 @@
         "title": "AC PID Frequency Temp konfigurieren",
         "menu_options": {
           "entities": "Entitäten ändern",
-          "tuning": "Regelparameter ändern"
+          "tuning": "Regelparameter ändern",
+          "mqtt": "ProtoART MQTT & Sensordiagnose"
         }
       },
       "entities": {
@@ -70,7 +71,31 @@
           "weather_trigger_delta_k": "Ändert sich die Außentemperatur um mindestens diesen Wert (Standard 5 K), wird die Mindestmodulation zur Neu-Validierung freigegeben.",
           "probe_interval_min": "Läuft die Anlage diese Zeit (Standard 240 min) ununterbrochen auf Mindestmodulation, tastet der Regler sanft nach unten ab."
         }
+      },
+      "mqtt": {
+        "title": "ProtoART MQTT-Temperaturversand",
+        "description": "Veröffentlicht die simulierte Temperatur unabhängig vom Hz-Regeltakt. Zunächst ausgeschaltet lassen, solange die bisherige Automation sendet. Der Raumtemperatursensor muss konfiguriert sein.",
+        "data": {
+          "mqtt_enabled": "Temperatur per MQTT senden",
+          "mqtt_topic": "MQTT-Topic für externe Temperatur",
+          "mqtt_interval_s": "Sendeintervall (Sekunden)",
+          "mqtt_qos": "MQTT QoS",
+          "mqtt_retain": "MQTT Retain",
+          "room_sensor_stale_s": "Raumsensor veraltet nach (Sekunden)"
+        },
+        "data_description": {
+          "mqtt_enabled": "Nur einschalten, wenn die bisherige MQTT-Automation abgeschaltet ist.",
+          "mqtt_topic": "Beispiel: climacontrol/HVAC_9C2FDC/sensor/external/temperature/set",
+          "mqtt_interval_s": "Intervall unabhängig vom 60-Sekunden-Frequenzregler; Standard 5 Sekunden.",
+          "mqtt_qos": "Standard 0 (Fire-and-forget).",
+          "mqtt_retain": "Standard aus: Der Broker soll keinen alten Temperaturwert speichern.",
+          "room_sensor_stale_s": "Sind Raumtemperatur-Meldungen älter, wird nichts mehr veröffentlicht. Standard 300 Sekunden."
+        }
       }
+    },
+    "error": {
+      "invalid_mqtt_topic": "Bitte ein gültiges MQTT-Topic ohne Wildcards eingeben.",
+      "room_sensor_required": "Bitte zuerst unter 'Entitäten ändern' einen echten Raumtemperatursensor auswählen."
     }
   },
   "entity": {
@@ -104,6 +129,36 @@
       },
       "learned_min_hz": {
         "name": "Erreichte Mindestmodulation"
+      },
+      "mqtt_status": {
+        "name": "MQTT-Sendestatus",
+        "state": {
+          "disabled": "Deaktiviert",
+          "sent": "Veröffentlicht",
+          "invalid_topic": "Ungültiges Topic",
+          "room_not_configured": "Raumsensor fehlt in Konfiguration",
+          "room_missing": "Raumsensor nicht gefunden",
+          "room_invalid": "Raumsensor ungültig",
+          "room_stale": "Raumsensor veraltet",
+          "output_unavailable": "Berechneter Temperaturwert fehlt",
+          "mqtt_error": "MQTT-Fehler"
+        }
+      },
+      "mqtt_last_publish": {
+        "name": "Letzte MQTT-Veröffentlichung"
+      },
+      "room_sensor_status": {
+        "name": "Raumsensor-Status",
+        "state": {
+          "not_configured": "Nicht konfiguriert",
+          "missing": "Nicht gefunden",
+          "invalid": "Ungültiger Wert",
+          "stale": "Veraltet",
+          "ok": "Aktuell"
+        }
+      },
+      "room_sensor_age": {
+        "name": "Raumsensor-Alter"
       }
     },
     "number": {

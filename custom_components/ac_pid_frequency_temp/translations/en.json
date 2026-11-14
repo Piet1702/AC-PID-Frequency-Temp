@@ -33,7 +33,8 @@
         "title": "Configure AC PID Frequency Temp",
         "menu_options": {
           "entities": "Change entities",
-          "tuning": "Change control parameters"
+          "tuning": "Change control parameters",
+          "mqtt": "ProtoART MQTT & sensor diagnostics"
         }
       },
       "entities": {
@@ -70,7 +71,31 @@
           "weather_trigger_delta_k": "If the outdoor temperature changes by at least this amount (default 5 K), minimum modulation is re-evaluated.",
           "probe_interval_min": "If operating at minimum modulation for this long (default 240 min), the controller gently probes downward."
         }
+      },
+      "mqtt": {
+        "title": "ProtoART MQTT temperature publishing",
+        "description": "Publish the simulated value independently of the frequency controller. Leave disabled while another automation is publishing. A real room sensor is required.",
+        "data": {
+          "mqtt_enabled": "Publish temperature via MQTT",
+          "mqtt_topic": "External temperature MQTT topic",
+          "mqtt_interval_s": "Publish interval (seconds)",
+          "mqtt_qos": "MQTT QoS",
+          "mqtt_retain": "MQTT retain",
+          "room_sensor_stale_s": "Room sensor stale after (seconds)"
+        },
+        "data_description": {
+          "mqtt_enabled": "Enable only after disabling the old MQTT automation.",
+          "mqtt_topic": "Example: climacontrol/HVAC_9C2FDC/sensor/external/temperature/set",
+          "mqtt_interval_s": "Independent of frequency control (default 5 s).",
+          "mqtt_qos": "Default 0.",
+          "mqtt_retain": "Default off; do not cache stale temperature.",
+          "room_sensor_stale_s": "Publishing stops when the room sensor is older (default 300 s)."
+        }
       }
+    },
+    "error": {
+      "invalid_mqtt_topic": "Enter a valid MQTT topic without wildcards.",
+      "room_sensor_required": "Select a real room temperature sensor under 'Change entities' first."
     }
   },
   "entity": {
@@ -104,6 +129,36 @@
       },
       "learned_min_hz": {
         "name": "Achieved minimum modulation"
+      },
+      "mqtt_status": {
+        "name": "MQTT publishing status",
+        "state": {
+          "disabled": "Disabled",
+          "sent": "Published",
+          "invalid_topic": "Invalid topic",
+          "room_not_configured": "No room sensor configured",
+          "room_missing": "Room sensor not found",
+          "room_invalid": "Invalid room sensor",
+          "room_stale": "Stale room sensor",
+          "output_unavailable": "Simulated temperature unavailable",
+          "mqtt_error": "MQTT error"
+        }
+      },
+      "mqtt_last_publish": {
+        "name": "Last MQTT publication"
+      },
+      "room_sensor_status": {
+        "name": "Room sensor status",
+        "state": {
+          "not_configured": "Not configured",
+          "missing": "Missing",
+          "invalid": "Invalid",
+          "stale": "Stale",
+          "ok": "Current"
+        }
+      },
+      "room_sensor_age": {
+        "name": "Room sensor age"
       }
     },
     "number": {
