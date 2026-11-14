@@ -16,7 +16,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.ac_pid_frequency.const import (
+from custom_components.ac_pid_frequency_temp.const import (
     CONF_CLIMATE,
     CONF_DEFROST,
     CONF_FREQUENCY,
@@ -223,7 +223,7 @@ async def test_numbers_and_status_attributes(hass: HomeAssistant) -> None:
     assert float(hass.states.get(target).state) == 25.0
 
     attrs = hass.states.get(_eid(hass, entry, "sensor", "status")).attributes
-    assert attrs["ac_pid_frequency_climate"] == CLIMATE
+    assert attrs["ac_pid_frequency_temp_climate"] == CLIMATE
     assert attrs["frequency_entity"] == HZ
     assert attrs["outdoor_temperature_entity"] == OUTDOOR
     assert attrs["room_temperature_entity"] == ROOM
@@ -329,10 +329,10 @@ async def test_card_is_served(hass: HomeAssistant, hass_client) -> None:
     assert await async_setup_component(hass, "http", {})
     entry = await _setup(hass)
     client = await hass_client()
-    response = await client.get("/ac_pid_frequency/ac-pid-frequency-card.js")
+    response = await client.get("/ac_pid_frequency_temp/ac-pid-frequency-temp-card.js")
     assert response.status == 200
     body = await response.text()
-    assert "ac-pid-frequency-card" in body
+    assert "ac-pid-frequency-temp-card" in body
     assert entry.state is ConfigEntryState.LOADED
 
 

@@ -7,7 +7,7 @@ import importlib.util
 from pathlib import Path
 import sys
 
-_PATH = Path(__file__).parent.parent / "custom_components" / "ac_pid_frequency" / "regelung.py"
+_PATH = Path(__file__).parent.parent / "custom_components" / "ac_pid_frequency_temp" / "regelung.py"
 _spec = importlib.util.spec_from_file_location("regelung", _PATH)
 regelung = importlib.util.module_from_spec(_spec)
 sys.modules["regelung"] = regelung

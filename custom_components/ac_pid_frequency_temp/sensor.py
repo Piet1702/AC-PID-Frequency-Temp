@@ -95,7 +95,7 @@ class StatusSensor(AcPidFrequencyEntity, SensorEntity):
 
         return {
             # Schlüssel, über den die Karte "ihren" Regler zur Climate-Entität findet
-            "ac_pid_frequency_climate": cfg[CONF_CLIMATE],
+            "ac_pid_frequency_temp_climate": cfg[CONF_CLIMATE],
             "frequency_entity": cfg[CONF_FREQUENCY],
             "outdoor_temperature_entity": cfg.get(CONF_OUTDOOR_TEMP),
             "room_temperature_entity": cfg.get(CONF_ROOM_TEMP),

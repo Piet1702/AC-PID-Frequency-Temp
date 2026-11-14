@@ -1,10 +1,10 @@
-"""Konstanten für AC PID Frequency."""
+"""Konstanten für AC PID Frequency Temp."""
 
 from __future__ import annotations
 
 from homeassistant.const import Platform
 
-DOMAIN = "ac_pid_frequency"
+DOMAIN = "ac_pid_frequency_temp"
 
 PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SWITCH, Platform.BUTTON]
 
@@ -25,7 +25,7 @@ CONF_MAX_ROOM_OVERHEAT = "max_room_overheat"
 CONF_WEATHER_TRIGGER_DELTA = "weather_trigger_delta_k"
 CONF_PROBE_INTERVAL = "probe_interval_min"
 
-DEFAULT_NAME = "AC PID Frequency"
+DEFAULT_NAME = "AC PID Frequency Temp"
 DEFAULT_FAULT_TIMEOUT_MIN = 10
 
 # Standardwerte der Regel-Parameter
@@ -69,5 +69,5 @@ HVAC_MODE_ACTIVE = "heat"  # Heizen
 STORAGE_VERSION = 1
 
 # --- Frontend -----------------------------------------------------------------------------
-CARD_FILE = "ac-pid-frequency-card.js"
+CARD_FILE = "ac-pid-frequency-temp-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILE}"

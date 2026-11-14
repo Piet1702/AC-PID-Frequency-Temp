@@ -81,7 +81,7 @@ def _to_float(value: Any) -> float | None:
 
 
 class AcPidFrequencyController:
-    """Hält Zustand und Zeitgeber von AC PID Frequency (ein Config-Entry)."""
+    """Hält Zustand und Zeitgeber von AC PID Frequency Temp (ein Config-Entry)."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
@@ -97,7 +97,7 @@ class AcPidFrequencyController:
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
             manufacturer="Eigenbau",
-            model="AC PID Frequency",
+            model="AC PID Frequency Temp",
         )
 
         # Regelkern-Zustand (inkl. gelernter Werte)

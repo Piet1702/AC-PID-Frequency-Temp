@@ -1,12 +1,14 @@
+/* AC PID Frequency Temp: isolierter Skript-Scope (Parallelbetrieb) */
+(() => {
 /*
- * AC PID Frequency – Lovelace-Karte
+ * AC PID Frequency Temp – Lovelace-Karte
  *
  * Sieht aus und bedient sich wie die Thermostat-Karte von Home Assistant, zeigt zusätzlich
  * die Kompressor-Ist-Frequenz und bietet ein Eingabefeld mit +/- für die Ziel-Frequenz.
- * Wird von der Integration "ac_pid_frequency" automatisch ausgeliefert und geladen.
+ * Wird von der Integration "ac_pid_frequency_temp" automatisch ausgeliefert und geladen.
  *
  * Minimale Konfiguration:
- *   type: custom:ac-pid-frequency-card
+ *   type: custom:ac-pid-frequency-temp-card
  *   entity: climate.mein_master_innengeraet
  *
  * Optional:
@@ -64,7 +66,7 @@ const HZ_I18N = {
     min_hz_label: "Learned min Hz", reset_min: "Reset", reset_min_title: "Reset learned minimum frequency and re-learn",
     passthrough: "real room temperature passed through",
     more: "Details", minus: "Less", plus: "More",
-    not_found: "No AC PID Frequency controller found for this air conditioner. Is the integration set up?",
+    not_found: "No AC PID Frequency Temp controller found for this air conditioner. Is the integration set up?",
     entity: "Air conditioner (master indoor unit)", name: "Name (optional)",
     controller_entity: "Controller status sensor (optional)",
   },
@@ -281,7 +283,7 @@ const HZ_TEMPLATE = `
 
 class AcPidFrequencyCard extends HTMLElement {
   static getConfigElement() {
-    return document.createElement("ac-pid-frequency-card-editor");
+    return document.createElement("ac-pid-frequency-temp-card-editor");
   }
 
   static getStubConfig(hass) {
@@ -439,12 +441,12 @@ class AcPidFrequencyCard extends HTMLElement {
     const states = this._hass.states;
     if (this._config.controller) return states[this._config.controller] || null;
     if (this._ctrlId && states[this._ctrlId] &&
-        states[this._ctrlId].attributes.ac_pid_frequency_climate === this._config.entity) {
+        states[this._ctrlId].attributes.ac_pid_frequency_temp_climate === this._config.entity) {
       return states[this._ctrlId];
     }
     this._ctrlId = null;
     for (const id in states) {
-      if (id.startsWith("sensor.") && states[id].attributes.ac_pid_frequency_climate === this._config.entity) {
+      if (id.startsWith("sensor.") && states[id].attributes.ac_pid_frequency_temp_climate === this._config.entity) {
         this._ctrlId = id;
         return states[id];
       }
@@ -856,7 +858,7 @@ class AcPidFrequencyCardEditor extends HTMLElement {
     this._form.schema = [
       { name: "entity", required: true, selector: { entity: { domain: "climate" } } },
       { name: "name", selector: { text: {} } },
-      { name: "controller", selector: { entity: { domain: "sensor", integration: "ac_pid_frequency" } } },
+      { name: "controller", selector: { entity: { domain: "sensor", integration: "ac_pid_frequency_temp" } } },
       { name: "show_units", selector: { boolean: {} } },
     ];
     this._form.computeLabel = (schema) =>
@@ -873,16 +875,16 @@ class AcPidFrequencyCardEditor extends HTMLElement {
 // Elemente können für das (gepatchte) Element-Register von HA unsichtbar bleiben
 // ("Custom element doesn't exist") – je nach Ladereihenfolge mal ja, mal nein.
 const HZ_DEFINE = () => {
-  if (customElements.get("ac-pid-frequency-card")) return true;
+  if (customElements.get("ac-pid-frequency-temp-card")) return true;
   try {
-    customElements.define("ac-pid-frequency-card", AcPidFrequencyCard);
-    if (!customElements.get("ac-pid-frequency-card-editor")) {
-      customElements.define("ac-pid-frequency-card-editor", AcPidFrequencyCardEditor);
+    customElements.define("ac-pid-frequency-temp-card", AcPidFrequencyCard);
+    if (!customElements.get("ac-pid-frequency-temp-card-editor")) {
+      customElements.define("ac-pid-frequency-temp-card-editor", AcPidFrequencyCardEditor);
     }
   } catch (err) {
-    console.warn("AC-PID-FREQUENCY-CARD: Registrierung fehlgeschlagen", err);
+    console.warn("AC-PID-FREQUENCY-TEMP-CARD: Registrierung fehlgeschlagen", err);
   }
-  return !!customElements.get("ac-pid-frequency-card");
+  return !!customElements.get("ac-pid-frequency-temp-card");
 };
 (() => {
   const started = Date.now();
@@ -898,10 +900,10 @@ const HZ_DEFINE = () => {
 })();
 
 window.customCards = window.customCards || [];
-if (!window.customCards.some((c) => c.type === "ac-pid-frequency-card")) {
+if (!window.customCards.some((c) => c.type === "ac-pid-frequency-temp-card")) {
   window.customCards.push({
-    type: "ac-pid-frequency-card",
-    name: "AC PID Frequency",
+    type: "ac-pid-frequency-temp-card",
+    name: "AC PID Frequency Temp",
     description:
       "Thermostat-Karte mit Kompressor-Frequenz, Ziel-Hz-Eingabe und Regler-Schalter.",
     preview: false,
@@ -909,7 +911,8 @@ if (!window.customCards.some((c) => c.type === "ac-pid-frequency-card")) {
 }
 
 console.info(
-  `%c AC-PID-FREQUENCY-CARD %c ${HZ_CARD_VERSION} `,
+  `%c AC-PID-FREQUENCY-TEMP-CARD %c ${HZ_CARD_VERSION} `,
   "color:#fff;background:#ff8100;font-weight:700",
   "color:#ff8100;background:#fff"
 );
+})();

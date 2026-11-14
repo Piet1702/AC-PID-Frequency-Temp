@@ -1,0 +1,18 @@
+{
+  "domain": "ac_pid_frequency_temp",
+  "name": "AC PID Frequency Temp",
+  "codeowners": [
+    "@Piet1702"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "frontend",
+    "http"
+  ],
+  "documentation": "https://github.com/Piet1702/AC-PID-Frequency-Temp",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Piet1702/AC-PID-Frequency-Temp/issues",
+  "requirements": [],
+  "version": "2.4.1.1"
+}

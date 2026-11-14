@@ -1,4 +1,4 @@
-"""AC PID Frequency: stellt der Klimaanlage einen vorgetäuschten Raumsensor bereit, mit dem sie auf eine Ziel-Frequenz einpendelt."""
+"""AC PID Frequency Temp: stellt der Klimaanlage einen vorgetäuschten Raumsensor bereit, mit dem sie auf eine Ziel-Frequenz einpendelt."""
 
 from __future__ import annotations
 

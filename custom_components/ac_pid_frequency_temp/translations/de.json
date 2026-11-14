@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "AC PID Frequency einrichten",
+        "title": "AC PID Frequency Temp einrichten",
         "description": "Der Regler lernt selbstständig unter verschiedensten Bedingungen (Abtauen, Reaktionszeiten, Mindestmodulation), die Klimaanlage sicher auf deine Ziel-Frequenz einzupendeln.",
         "data": {
           "name": "Name",
@@ -30,7 +30,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "AC PID Frequency konfigurieren",
+        "title": "AC PID Frequency Temp konfigurieren",
         "menu_options": {
           "entities": "Entitäten ändern",
           "tuning": "Regelparameter ändern"

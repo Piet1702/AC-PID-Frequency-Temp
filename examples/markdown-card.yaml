@@ -1,13 +1,13 @@
-# Markdown-Karte für AC PID Frequency
+# Markdown-Karte für AC PID Frequency Temp
 # Einzige Anpassung: die Entität des Status-Sensors in der ersten Zeile des Templates
-# (Einstellungen → Geräte & Dienste → AC PID Frequency → Gerät → Diagnose → "Status").
+# (Einstellungen → Geräte & Dienste → AC PID Frequency Temp → Gerät → Diagnose → "Status").
 # Alle anderen Entitäten (Hz, Ziel, Raum, Außen, Sendetemperatur ...) liest das
 # Template selbst aus den Attributen dieses Sensors.
 type: markdown
 content: |-
-  {% set st = 'sensor.ac_pid_frequency_status' -%}
+  {% set st = 'sensor.ac_pid_frequency_temp_status' -%}
   {% set status = states(st) -%}
-  {% set clim = state_attr(st, 'ac_pid_frequency_climate') -%}
+  {% set clim = state_attr(st, 'ac_pid_frequency_temp_climate') -%}
   {% set pt = state_attr(st, 'passthrough') -%}
   {% set e_hz = state_attr(st, 'frequency_entity') -%}
   {% set e_tgt = state_attr(st, 'target_hz_entity') -%}
@@ -60,7 +60,7 @@ content: |-
     'waiting': 'Eingangsdaten fehlen, der letzte Wert wird gehalten.',
     'fault': 'Eingangsdaten fehlen zu lange, die Anlage nutzt ihren eigenen Sensor.'} -%}
   {% if status in ['unavailable', 'unknown'] or not clim -%}
-  ### ⚠ AC PID Frequency nicht verfügbar
+  ### ⚠ AC PID Frequency Temp nicht verfügbar
   Status-Sensor `{{ st }}` nicht gefunden oder nicht verfügbar.
   {%- else -%}
   ### {{ titel.get(status, status) }}

@@ -1,5 +1,5 @@
 {
-  "name": "AC PID Frequency",
+  "name": "AC PID Frequency Temp",
   "homeassistant": "2024.12.0",
   "render_readme": true
 }

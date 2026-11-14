@@ -1,4 +1,4 @@
-"""Intelligenter, selbstlernender Regelkern für AC PID Frequency.
+"""Intelligenter, selbstlernender Regelkern für AC PID Frequency Temp.
 
 Reine Logik ohne Home-Assistant-Abhängigkeit, vollständig testbar.
 

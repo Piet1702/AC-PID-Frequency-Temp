@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/banner.png" alt="AC PID Frequency" width="720">
+  <img src="assets/banner.png" alt="AC PID Frequency Temp" width="720">
 </p>
 
-# AC PID Frequency
+# AC PID Frequency Temp
 
 Home-Assistant-Integration (HACS), die einer Klimaanlage einen **vorgetäuschten externen Raumtemperatursensor** liefert und sie damit auf eine **Ziel-Frequenz (Hz)** des Kompressors einpendelt. Die eigentliche Regelung bleibt bei der Anlage – die Integration verschiebt nur deren Eingangsgröße in 0,1-K-Schritten.
 
@@ -27,8 +27,8 @@ Funktioniert mit jeder Anlage, deren Integration einen externen Raumsensor (Home
 ## Installation
 
 1. HACS → Benutzerdefinierte Repositories → dieses Repository als *Integration* hinzufügen → installieren → **Home Assistant neu starten**.
-   (Manuell: Ordner `custom_components/ac_pid_frequency` nach `/config/custom_components/` kopieren und neu starten.)
-2. Einstellungen → Geräte & Dienste → Integration hinzufügen → **AC PID Frequency**.
+   (Manuell: Ordner `custom_components/ac_pid_frequency_temp` nach `/config/custom_components/` kopieren und neu starten.)
+2. Einstellungen → Geräte & Dienste → Integration hinzufügen → **AC PID Frequency Temp**.
 3. Auswählen:
    * **Master-Klimaanlage** (Pflicht)
    * **Kompressor-Frequenz** (Pflicht)
@@ -57,7 +57,7 @@ Beispiel für eine eigene Automation (z. B. PV-Logik):
 ```yaml
 action: number.set_value
 target:
-  entity_id: number.ac_pid_frequency_ziel_frequenz
+  entity_id: number.ac_pid_frequency_temp_ziel_frequenz
 data:
   value: "{{ 48 if is_state('input_boolean.pv_ueberschuss', 'on') else 22 }}"
 ```
@@ -75,10 +75,10 @@ Die Diagnose-Attribute des Status-Sensors zeigen mit `passthrough: true`, wann d
 
 ## Lovelace-Karte
 
-Wird von der Integration mitgeliefert und automatisch geladen (kein Eintrag unter *Ressourcen* nötig). Im Dashboard „Karte hinzufügen“ → **AC PID Frequency**, oder per YAML:
+Wird von der Integration mitgeliefert und automatisch geladen (kein Eintrag unter *Ressourcen* nötig). Im Dashboard „Karte hinzufügen“ → **AC PID Frequency Temp**, oder per YAML:
 
 ```yaml
-type: custom:ac-pid-frequency-card
+type: custom:ac-pid-frequency-temp-card
 entity: climate.mein_master_innengeraet
 # name: Flur            (optional)
 # show_units: false     (weitere Innengeräte ausblenden)
@@ -89,7 +89,7 @@ Die Karte sieht aus wie die Thermostat-Karte (Ziehbogen, +/-, Betriebsarten) und
 
 ## Logo / Branding
 
-Die Logos liegen im Ordner `custom_components/ac_pid_frequency/brand/` (`icon`, `logo`, jeweils `dark_` und `@2x`). Ab **Home Assistant 2026.3** werden sie von dort automatisch genutzt – ohne Eintrag im brands-Repository. Im Repository-Root liegen `icon.png` und `logo.png` für HACS/GitHub, unter `assets/` das Banner (`banner.png`, auch als `social-preview.png` für die GitHub-Repo-Einstellungen) und die SVG-Quellen.
+Die Logos liegen im Ordner `custom_components/ac_pid_frequency_temp/brand/` (`icon`, `logo`, jeweils `dark_` und `@2x`). Ab **Home Assistant 2026.3** werden sie von dort automatisch genutzt – ohne Eintrag im brands-Repository. Im Repository-Root liegen `icon.png` und `logo.png` für HACS/GitHub, unter `assets/` das Banner (`banner.png`, auch als `social-preview.png` für die GitHub-Repo-Einstellungen) und die SVG-Quellen.
 
 ## Entwicklung / Tests
 
