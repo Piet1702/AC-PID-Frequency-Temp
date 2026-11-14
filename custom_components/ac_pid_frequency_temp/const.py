@@ -26,6 +26,8 @@ CONF_ROOM_STALE = "room_sensor_stale_s"
 CONF_CONTROL_MODE = "control_mode"
 MODE_FREQUENCY = "frequency"
 MODE_ROOM_OBSERVE = "room_observe"
+MODE_ROOM_AUTO = "room_auto"
+CONF_ROOM_MAX_HZ = "room_max_hz"
 CONF_ROOM_TARGET = "room_target_temp"
 CONF_PREFERRED_HZ = "room_preferred_hz"
 CONF_ROOM_OVERHEAT_DELTA = "room_overheat_delta_k"
@@ -38,6 +40,7 @@ ROOM_DEFAULTS = {
     CONF_ROOM_OVERHEAT_DELTA: 2.0,
     CONF_ROOM_RESTART_DELTA: 0.5,
     CONF_ROOM_OBSERVE_WINDOW: 30.0,
+    CONF_ROOM_MAX_HZ: 40.0,
 }
 MQTT_DEFAULTS = {
     CONF_MQTT_ENABLED: False,
@@ -102,3 +105,7 @@ STORAGE_VERSION = 1
 # --- Frontend -----------------------------------------------------------------------------
 CARD_FILE = "ac-pid-frequency-temp-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILE}"
+
+# Automatische Raumregelung: am Überheizungs-Limit keine Mindest-Hz erzwingen.
+STATUS_ROOM_HEAT_PAUSE = "room_heat_pause"
+STATUSES.append(STATUS_ROOM_HEAT_PAUSE)

@@ -330,6 +330,8 @@ def step(
     outdoor_temp: float | None = None,
     room_temp: float | None = None,
     defrost: bool = False,
+    automatic_target: bool = False,
+    overheat_limit_temp: float | None = None,
 ) -> Result:
     """Führt einen intelligenten, selbstlernenden Regelschritt aus."""
     s.time_since_last_step += p.interval_s
@@ -345,7 +347,8 @@ def step(
     # ==================================================================
     # User-Trigger: Wurde die Soll-Hz oder die Soll-Temperatur vom User verändert?
     user_changed_target = (
-        s.last_target_hz is not None and abs(target_hz - s.last_target_hz) >= 0.8
+        not automatic_target and s.last_target_hz is not None
+        and abs(target_hz - s.last_target_hz) >= 0.8
     )
     user_changed_setpoint = (
         s.last_setpoint is not None and abs(setpoint - s.last_setpoint) >= 0.2
@@ -530,7 +533,7 @@ def step(
     # ==================================================================
     # 6. THERMISCHER RAUM-ÜBERHITZUNGSSCHUTZ
     # ==================================================================
-    if room_temp is not None and room_temp >= (setpoint + p.max_room_overheat):
+    if room_temp is not None and room_temp >= (overheat_limit_temp if overheat_limit_temp is not None else setpoint + p.max_room_overheat):
         v_out = _clamp(setpoint + 0.3, low, high)
         s.output = v_out
         s.time_since_last_step = 0.0

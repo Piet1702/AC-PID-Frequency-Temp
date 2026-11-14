@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import CONF_CONTROL_MODE, MODE_FREQUENCY, MODE_ROOM_OBSERVE
+from .const import CONF_CONTROL_MODE, MODE_FREQUENCY, MODE_ROOM_OBSERVE, MODE_ROOM_AUTO
 from .controller import AcPidFrequencyController
 from .entity import AcPidFrequencyEntity
 
@@ -21,7 +21,7 @@ class ControlModeSelect(AcPidFrequencyEntity, SelectEntity):
     """Explizite Auswahl: Frequenzregelung oder sichere Raum-Beobachtung."""
 
     _attr_icon = "mdi:thermostat-auto"
-    _attr_options = [MODE_FREQUENCY, MODE_ROOM_OBSERVE]
+    _attr_options = [MODE_FREQUENCY, MODE_ROOM_OBSERVE, MODE_ROOM_AUTO]
 
     def __init__(self, controller: AcPidFrequencyController) -> None:
         super().__init__(controller, "control_mode")
@@ -33,8 +33,8 @@ class ControlModeSelect(AcPidFrequencyEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         if option not in self._attr_options:
             raise HomeAssistantError("Ungültiger Regelmodus")
-        if option == MODE_ROOM_OBSERVE:
-            # Vor dem Options-Reload sofort aktiven Frequenzregler abschalten.
+        # Bei JEDEM Moduswechsel erst deaktivieren. Aktivierung nur manuell.
+        if option != self.current_option:
             self.controller.async_set_enabled(False)
         self.hass.config_entries.async_update_entry(
             self.controller.entry,

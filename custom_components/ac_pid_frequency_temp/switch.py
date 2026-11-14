@@ -8,8 +8,8 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import CONF_MQTT_ENABLED, CONF_MQTT_RETAIN, CONF_MQTT_TOPIC, CONF_ROOM_TEMP, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE
-from .protoart_mqtt import valid_publish_topic
+from .const import CONF_MQTT_ENABLED, CONF_MQTT_RETAIN, CONF_MQTT_TOPIC, CONF_ROOM_TEMP, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE, MODE_ROOM_AUTO, CONF_ROOM_STALE
+from .protoart_mqtt import valid_publish_topic, room_sensor_snapshot
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -39,6 +39,16 @@ class EnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         if self.controller.config[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
             raise HomeAssistantError("Im Raum-Beobachtungsmodus ist die Hz-Regelung gesperrt.")
+        cfg = self.controller.config
+        if cfg[CONF_CONTROL_MODE] == MODE_ROOM_AUTO:
+            room_id = cfg.get(CONF_ROOM_TEMP)
+            status, _age, _report = room_sensor_snapshot(
+                self.hass, room_id, float(cfg[CONF_ROOM_STALE])
+            )
+            if status != "ok":
+                raise HomeAssistantError(
+                    f"Adaptive Raumregelung benötigt frische echte Raumdaten: {status}"
+                )
         self.controller.async_set_enabled(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:

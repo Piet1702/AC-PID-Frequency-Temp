@@ -51,6 +51,7 @@ async def async_setup_entry(
             RoomDeltaSensor(controller),
             RoomAdviceSensor(controller),
             RoomMinHzDurationSensor(controller),
+            RoomAutoStatusSensor(controller),
             MqttStatusSensor(controller),
             MqttLastPublishSensor(controller),
             RoomSensorStatusSensor(controller),
@@ -390,3 +391,27 @@ class RoomMinHzDurationSensor(AcPidFrequencyEntity, SensorEntity):
     @property
     def native_value(self) -> float:
         return self.controller.room_observer.snapshot.minutes_at_min_hz
+
+
+class RoomAutoStatusSensor(AcPidFrequencyEntity, SensorEntity):
+    """Warum und wann der neue äußere Temperaturregler Ziel-Hz verändert."""
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:brain"
+    def __init__(self, controller):
+        super().__init__(controller, "room_auto_status")
+    @property
+    def native_value(self) -> str:
+        return self.controller.room_auto.decision.state
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self.controller.room_auto.decision
+        return {
+            "reason": d.reason,
+            "action": d.action,
+            "calculated_target_hz": d.target_hz,
+            "next_regular_check_min": d.next_check_min,
+            "heat_suppressed": d.heat_suppressed,
+            "writes_mqtt_power": False,
+            "actual_room_temperature": self.controller.room_observer.snapshot.room_temp,
+            "temperature_trend_c_per_h": self.controller.room_observer.snapshot.trend_kph,
+        }

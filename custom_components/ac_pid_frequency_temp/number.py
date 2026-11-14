@@ -8,6 +8,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import (
     CONF_MQTT_INTERVAL, CONF_MQTT_QOS, CONF_ROOM_TARGET, CONF_PREFERRED_HZ,
     CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA, CONF_ROOM_OBSERVE_WINDOW,
+    CONF_ROOM_MAX_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfFrequency
@@ -23,7 +24,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: AcPidFrequencyController = entry.runtime_data
-    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller)])
+    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller)])
 
 
 class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
@@ -45,6 +46,8 @@ class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
         return self.controller.target_hz
 
     async def async_set_native_value(self, value: float) -> None:
+        if self.controller.config[CONF_CONTROL_MODE] == MODE_ROOM_AUTO:
+            raise HomeAssistantError("Im Automatikmodus berechnet der Raumregler die Ziel-Hz.")
         self.controller.async_set_target_hz(value)
 
 
@@ -179,3 +182,15 @@ class RoomWindowNumber(RoomConfigNumber):
     _attr_native_step = 5
     def __init__(self, controller):
         super().__init__(controller, "room_observation_window")
+
+
+class RoomMaxHzNumber(RoomConfigNumber):
+    """Maximal erlaubte automatische Ziel-Hz für die erste Testphase."""
+    option_key = CONF_ROOM_MAX_HZ
+    _attr_icon = "mdi:speedometer"
+    _attr_native_unit_of_measurement = "Hz"
+    _attr_native_min_value = 20
+    _attr_native_max_value = 60
+    _attr_native_step = 1
+    def __init__(self, controller):
+        super().__init__(controller, "room_max_hz")

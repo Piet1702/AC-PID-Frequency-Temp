@@ -115,7 +115,8 @@
           "defrost": "Abtauen aktiv (pausiert)",
           "overheat": "Überhitzungsschutz aktiv",
           "waiting": "Daten fehlen (Wert gehalten)",
-          "fault": "Fehler (Sensor nicht verfügbar)"
+          "fault": "Fehler (Sensor nicht verfügbar)",
+          "room_heat_pause": "Heizanforderung reduziert"
         }
       },
       "offset": {
@@ -195,6 +196,9 @@
       },
       "room_time_at_min_hz": {
         "name": "Zeit bei 20 Hz"
+      },
+      "room_auto_status": {
+        "name": "Adaptive Raumregelung – Status"
       }
     },
     "number": {
@@ -221,6 +225,9 @@
       },
       "room_observation_window": {
         "name": "Beobachtungsfenster"
+      },
+      "room_max_hz": {
+        "name": "Maximale automatische Ziel-Hz"
       }
     },
     "switch": {
@@ -252,7 +259,8 @@
         "name": "Regelmodus",
         "state": {
           "frequency": "Frequenzregelung",
-          "room_observe": "Raumtemperatur (nur beobachten)"
+          "room_observe": "Raumtemperatur (nur beobachten)",
+          "room_auto": "Raumtemperatur (automatisch)"
         }
       }
     }

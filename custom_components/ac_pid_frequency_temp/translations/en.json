@@ -115,7 +115,8 @@
           "defrost": "Defrost active (paused)",
           "overheat": "Overheat protection active",
           "waiting": "Data missing (value held)",
-          "fault": "Fault (sensor unavailable)"
+          "fault": "Fault (sensor unavailable)",
+          "room_heat_pause": "Heat demand reduced"
         }
       },
       "offset": {
@@ -195,6 +196,9 @@
       },
       "room_time_at_min_hz": {
         "name": "Time at 20 Hz"
+      },
+      "room_auto_status": {
+        "name": "Adaptive room control – status"
       }
     },
     "number": {
@@ -221,6 +225,9 @@
       },
       "room_observation_window": {
         "name": "Observation window"
+      },
+      "room_max_hz": {
+        "name": "Maximum automatic target Hz"
       }
     },
     "switch": {
@@ -252,7 +259,8 @@
         "name": "Control mode",
         "state": {
           "frequency": "Frequency control",
-          "room_observe": "Room temperature (observe only)"
+          "room_observe": "Room temperature (observe only)",
+          "room_auto": "Room temperature (automatic)"
         }
       }
     }

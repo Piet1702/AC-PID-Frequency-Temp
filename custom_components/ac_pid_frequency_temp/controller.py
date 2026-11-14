@@ -66,11 +66,13 @@ from .const import (
 )
 from .regelung import Params, State, round1, step
 from .room_observer import RoomObserver
+from .room_auto import RoomAutoController
 from .protoart_mqtt import room_sensor_snapshot
 from .const import (
     ROOM_DEFAULTS, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE, CONF_ROOM_TARGET,
     CONF_PREFERRED_HZ, CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA,
     CONF_ROOM_OBSERVE_WINDOW, CONF_ROOM_STALE, MQTT_DEFAULTS,
+    MODE_ROOM_AUTO, CONF_ROOM_MAX_HZ, CONF_MAX_OFFSET, STATUS_ROOM_HEAT_PAUSE,
 )
 from .protoart_mqtt import ProtoArtMqttBridge
 
@@ -114,6 +116,7 @@ class AcPidFrequencyController:
         self.regelung = State()
         self.mqtt_bridge = ProtoArtMqttBridge(self)
         self.room_observer = RoomObserver()
+        self.room_auto = RoomAutoController()
 
         # Vom Nutzer einstellbar (per Entität), werden gespeichert
         self.enabled = False
@@ -149,7 +152,7 @@ class AcPidFrequencyController:
         """Gespeicherten Zustand laden."""
         data = await self._store.async_load() or {}
         self.enabled = bool(data.get("enabled", False))
-        if self.config[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
+        if self.config[CONF_CONTROL_MODE] in (MODE_ROOM_OBSERVE, MODE_ROOM_AUTO):
             self.enabled = False  # Im Beobachtungsmodus niemals automatisch Hz regeln
         target = _to_float(data.get("target_hz"))
         output = _to_float(data.get("output"))
@@ -212,6 +215,8 @@ class AcPidFrequencyController:
     # ------------------------------------------------------------------ Bedienung
     @callback
     def async_set_enabled(self, enabled: bool) -> None:
+        if bool(enabled) != self.enabled:
+            self.room_auto.reset()
         self.enabled = enabled
         self._tick()
 
@@ -284,9 +289,29 @@ class AcPidFrequencyController:
             window_min=float(cfg[CONF_ROOM_OBSERVE_WINDOW]),
         )
 
+    def _update_room_auto(self) -> None:
+        """Nur Ziel-Hz berechnen; keine Power- oder Climate-Befehle ausgeben."""
+        cfg = self.config
+        if cfg[CONF_CONTROL_MODE] != MODE_ROOM_AUTO:
+            self.room_auto.reset()
+            return
+        decision = self.room_auto.update(
+            now=dt_util.utcnow(), observation=self.room_observer.snapshot,
+            running=self.enabled,
+            preferred_hz=float(cfg[CONF_PREFERRED_HZ]),
+            max_hz=float(cfg[CONF_ROOM_MAX_HZ]),
+            target_room_temp=float(cfg[CONF_ROOM_TARGET]),
+            max_overheat_k=float(cfg[CONF_ROOM_OVERHEAT_DELTA]),
+            restart_delta_k=float(cfg[CONF_ROOM_RESTART_DELTA]),
+            observation_window_min=float(cfg[CONF_ROOM_OBSERVE_WINDOW]),
+        )
+        if self.enabled and decision.target_hz is not None:
+            self.target_hz = decision.target_hz
+
     @callback
     def _tick(self) -> None:
         self._update_room_observer()
+        self._update_room_auto()
         self._evaluate()
         self._publish()
 
@@ -301,8 +326,44 @@ class AcPidFrequencyController:
         cfg = self.config
 
         if cfg[CONF_CONTROL_MODE] == MODE_ROOM_OBSERVE:
-            self._evaluate_disabled()  # kein Frequenzregler, keine synthetische Heizanforderung
+            self._evaluate_disabled()  # Beobachtung bleibt vollständig passiv
             return
+        if cfg[CONF_CONTROL_MODE] == MODE_ROOM_AUTO and self.enabled:
+            decision = self.room_auto.decision
+            if decision.state == "fault":
+                # Keine veralteten/simulierten Werte an die Klimaanlage weitergeben.
+                self._set_inactive(STATUS_FAULT)
+                return
+            if decision.state == "paused":
+                # Kein Regeleingriff während Abtauung und 10 Min Erholung.
+                self.regelung.was_defrosting = True
+                self.regelung.hz_prev1 = self.regelung.hz_prev2 = None
+                if self.output is None or not self.available:
+                    self._set_inactive(STATUS_WAITING)
+                else:
+                    self.status = STATUS_WAITING
+                return
+            if decision.heat_suppressed:
+                # Thermische Hysterese ohne MQTT-Powerbefehl: Heizbedarf herunterfahren.
+                climate_state = self.hass.states.get(cfg[CONF_CLIMATE])
+                if climate_state is None or climate_state.state != HVAC_MODE_ACTIVE:
+                    self._set_passive(STATUS_IDLE)
+                    return
+                climate_target = _to_float(climate_state.attributes.get("temperature"))
+                if climate_target is None:
+                    self._set_inactive(STATUS_FAULT)
+                    return
+                delta = min(0.3, max(0.0, float(cfg[CONF_MAX_OFFSET])))
+                self.output = round1(climate_target + delta)
+                self.regelung.output = self.output
+                self.regelung.last_running_hz = None
+                self.regelung.hz_prev1 = self.regelung.hz_prev2 = None
+                self.passthrough = False
+                self.available = True
+                self.offset = -delta
+                self.error_hz = None
+                self.status = STATUS_ROOM_HEAT_PAUSE
+                return
         if not self.enabled:
             self._evaluate_disabled()
             return
@@ -344,6 +405,11 @@ class AcPidFrequencyController:
             outdoor_temp=outdoor_temp,
             room_temp=room_temp,
             defrost=defrost,
+            automatic_target=(cfg[CONF_CONTROL_MODE] == MODE_ROOM_AUTO),
+            overheat_limit_temp=(
+                float(cfg[CONF_ROOM_TARGET]) + float(cfg[CONF_ROOM_OVERHEAT_DELTA])
+                if cfg[CONF_CONTROL_MODE] == MODE_ROOM_AUTO else None
+            ),
         )
         self.available = True
         self.passthrough = False
