@@ -6,7 +6,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "ac_pid_frequency_temp"
 
-PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SWITCH, Platform.BUTTON]
+PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SWITCH, Platform.BUTTON, Platform.TEXT]
 
 # --- Entitäten-Auswahl (Setup + Optionen) -------------------------------------------------
 CONF_NAME = "name"

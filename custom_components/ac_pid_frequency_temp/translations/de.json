@@ -164,11 +164,23 @@
     "number": {
       "target_hz": {
         "name": "Ziel-Frequenz"
+      },
+      "mqtt_interval": {
+        "name": "MQTT-Sendeintervall"
+      },
+      "mqtt_qos": {
+        "name": "MQTT QoS"
       }
     },
     "switch": {
       "enabled": {
         "name": "Hz-Regelung"
+      },
+      "mqtt_enabled": {
+        "name": "MQTT-Temperaturversand"
+      },
+      "mqtt_retain": {
+        "name": "MQTT Retain"
       }
     },
     "button": {
@@ -177,6 +189,11 @@
       },
       "reset_min_hz": {
         "name": "Erlernte Mindestmodulation zurücksetzen"
+      }
+    },
+    "text": {
+      "mqtt_topic": {
+        "name": "MQTT-Topic"
       }
     }
   }
