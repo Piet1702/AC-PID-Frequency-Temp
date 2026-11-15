@@ -53,6 +53,7 @@ async def async_setup_entry(
             RoomMinHzDurationSensor(controller),
             RoomAutoStatusSensor(controller),
             RoomContinuitySensor(controller),
+            SilentStatusSensor(controller),
             MqttStatusSensor(controller),
             MqttLastPublishSensor(controller),
             RoomSensorStatusSensor(controller),
@@ -456,5 +457,33 @@ class RoomContinuitySensor(AcPidFrequencyEntity, SensorEntity):
             "learning_updated_this_tick": ctrl.last_learned,
             "calculated_target_hz": ctrl.decision.target_hz,
             "reason": ctrl.decision.reason,
+            "mqtt_power_commands": False,
+        }
+
+
+class SilentStatusSensor(AcPidFrequencyEntity, SensorEntity):
+    """Anforderung und beobachteter ProtoART-Silent-Zustand getrennt darstellen."""
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:volume-mute"
+
+    def __init__(self, controller):
+        super().__init__(controller, "silent_status")
+
+    @property
+    def native_value(self) -> str:
+        return self.controller.silent_bridge.state
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        bridge = self.controller.silent_bridge
+        return {
+            "reason": bridge.reason,
+            "last_requested": bridge.last_requested,
+            "device_confirmed": bridge.confirmed,
+            "last_publish_at": bridge.last_sent_at.isoformat() if bridge.last_sent_at else None,
+            "last_confirmation_at": bridge.last_confirmed_at.isoformat() if bridge.last_confirmed_at else None,
+            "unconfirmed_attempts": bridge.attempts,
+            "boost_remaining_min": bridge.boost_left_min,
+            "mqtt_error": bridge.last_error,
             "mqtt_power_commands": False,
         }

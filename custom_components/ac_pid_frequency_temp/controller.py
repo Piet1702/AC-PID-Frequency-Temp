@@ -53,6 +53,7 @@ from .const import (
     CONF_WEATHER_TRIGGER_DELTA,
     DEFAULT_TARGET_HZ,
     DOMAIN,
+    SILENT_DEFAULTS,
     HVAC_MODE_ACTIVE,
     STATUS_FAULT,
     STATUS_IDLE,
@@ -67,6 +68,7 @@ from .const import (
 from .regelung import Params, State, round1, step
 from .room_observer import RoomObserver
 from .room_auto import RoomAutoController
+from .silent_bridge import ProtoArtSilentBridge
 from .protoart_mqtt import room_sensor_snapshot
 from .const import (
     ROOM_DEFAULTS, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE, CONF_ROOM_TARGET,
@@ -118,6 +120,7 @@ class AcPidFrequencyController:
         self.mqtt_bridge = ProtoArtMqttBridge(self)
         self.room_observer = RoomObserver()
         self.room_auto = RoomAutoController()
+        self.silent_bridge = ProtoArtSilentBridge(self)
 
         # Vom Nutzer einstellbar (per Entität), werden gespeichert
         self.enabled = False
@@ -135,7 +138,7 @@ class AcPidFrequencyController:
     @property
     def config(self) -> dict[str, Any]:
         """Setup-Daten, überschrieben von den Optionen, mit Standardwerten dahinter."""
-        return {**TUNING_DEFAULTS, **MQTT_DEFAULTS, **ROOM_DEFAULTS, **self.entry.data, **self.entry.options}
+        return {**TUNING_DEFAULTS, **MQTT_DEFAULTS, **ROOM_DEFAULTS, **SILENT_DEFAULTS, **self.entry.data, **self.entry.options}
 
     @property
     def params(self) -> Params:
@@ -193,11 +196,16 @@ class AcPidFrequencyController:
             timedelta(seconds=max(5.0, diag_interval)),
         ))
         self._handle_mqtt_diag_tick(None)
+        self._unsubs.append(async_track_time_interval(
+            self.hass, self._handle_silent_tick, timedelta(seconds=30),
+        ))
+        self._handle_silent_tick(None)
 
 
     async def async_shutdown(self) -> None:
         """Zeitgeber stoppen und Zustand sichern."""
         self.mqtt_bridge.stop()
+        await self.silent_bridge.async_stop()
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -242,6 +250,11 @@ class AcPidFrequencyController:
         self._publish()
 
     # ------------------------------------------------------------------ Takt
+    @callback
+    def _handle_silent_tick(self, _now: datetime | None) -> None:
+        """Silent-Zustand pruefen, unabhaengig vom Temperatur-MQTT-Takt."""
+        self.hass.async_create_task(self.silent_bridge.async_tick())
+
     @callback
     def _handle_mqtt_diag_tick(self, _now: datetime | None) -> None:
         """MQTT-Sendetakt / Sensordiagnose: 5-60 s unabhängig vom Regler."""

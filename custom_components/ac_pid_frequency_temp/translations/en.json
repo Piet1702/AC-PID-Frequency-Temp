@@ -210,6 +210,21 @@
           "guard_disabled": "Guard disabled",
           "monitoring": "Monitoring"
         }
+      },
+      "silent_status": {
+        "name": "ProtoART silent control – status",
+        "state": {
+          "disabled": "Disabled",
+          "topic_missing": "Topic missing",
+          "inactive": "Inactive",
+          "paused": "Paused",
+          "silent": "Silent",
+          "normal": "Normal",
+          "boost": "Boost",
+          "mqtt_error": "MQTT error",
+          "unconfirmed": "Unconfirmed",
+          "error": "Error"
+        }
       }
     },
     "number": {
@@ -242,6 +257,9 @@
       },
       "room_min_hz_guard": {
         "name": "20 Hz protection after minutes (0 = off)"
+      },
+      "silent_boost_minutes": {
+        "name": "Silent boost duration"
       }
     },
     "switch": {
@@ -261,11 +279,20 @@
       },
       "reset_min_hz": {
         "name": "Reset learned minimum modulation"
+      },
+      "silent_boost_start": {
+        "name": "Start silent boost"
+      },
+      "silent_boost_cancel": {
+        "name": "End silent boost"
       }
     },
     "text": {
       "mqtt_topic": {
         "name": "MQTT topic"
+      },
+      "silent_topic": {
+        "name": "ProtoART Silent MQTT topic"
       }
     },
     "select": {
@@ -275,6 +302,15 @@
           "frequency": "Frequency control",
           "room_observe": "Room temperature (observe only)",
           "room_auto": "Room temperature (automatic)"
+        }
+      },
+      "silent_policy": {
+        "name": "Silent control",
+        "state": {
+          "disabled": "Do not control",
+          "always_silent": "Always silent",
+          "auto": "Automatic",
+          "normal": "Always normal"
         }
       }
     }

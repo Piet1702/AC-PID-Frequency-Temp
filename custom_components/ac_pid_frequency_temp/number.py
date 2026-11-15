@@ -8,7 +8,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import (
     CONF_MQTT_INTERVAL, CONF_MQTT_QOS, CONF_ROOM_TARGET, CONF_PREFERRED_HZ,
     CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA, CONF_ROOM_OBSERVE_WINDOW,
-    CONF_ROOM_MAX_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD,
+    CONF_ROOM_MAX_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD, CONF_SILENT_BOOST_MINUTES,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfFrequency
@@ -24,7 +24,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: AcPidFrequencyController = entry.runtime_data
-    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller)])
+    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller)])
 
 
 class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
@@ -206,3 +206,16 @@ class RoomMinHzGuardNumber(RoomConfigNumber):
     _attr_native_step = 1
     def __init__(self, controller):
         super().__init__(controller, "room_min_hz_guard")
+
+
+class SilentBoostMinutesNumber(RoomConfigNumber):
+    """Wie lange der temporaere Normalleistungs-Boost dauern soll."""
+    option_key = CONF_SILENT_BOOST_MINUTES
+    _attr_icon = "mdi:timer-sand"
+    _attr_native_unit_of_measurement = "min"
+    _attr_native_min_value = 5
+    _attr_native_max_value = 120
+    _attr_native_step = 5
+
+    def __init__(self, controller):
+        super().__init__(controller, "silent_boost_minutes")

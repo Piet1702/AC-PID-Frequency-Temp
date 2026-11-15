@@ -210,6 +210,21 @@
           "guard_disabled": "Schutz deaktiviert",
           "monitoring": "Überwachung"
         }
+      },
+      "silent_status": {
+        "name": "ProtoART Silent-Steuerung – Status",
+        "state": {
+          "disabled": "Deaktiviert",
+          "topic_missing": "Topic fehlt",
+          "inactive": "Inaktiv",
+          "paused": "Pausiert",
+          "silent": "Silent",
+          "normal": "Normal",
+          "boost": "Boost",
+          "mqtt_error": "MQTT-Fehler",
+          "unconfirmed": "Nicht bestaetigt",
+          "error": "Fehler"
+        }
       }
     },
     "number": {
@@ -242,6 +257,9 @@
       },
       "room_min_hz_guard": {
         "name": "20-Hz-Schutz nach Minuten (0 = aus)"
+      },
+      "silent_boost_minutes": {
+        "name": "Silent-Boost-Dauer"
       }
     },
     "switch": {
@@ -261,11 +279,20 @@
       },
       "reset_min_hz": {
         "name": "Erlernte Mindestmodulation zurücksetzen"
+      },
+      "silent_boost_start": {
+        "name": "Silent-Boost starten"
+      },
+      "silent_boost_cancel": {
+        "name": "Silent-Boost beenden"
       }
     },
     "text": {
       "mqtt_topic": {
         "name": "MQTT-Topic"
+      },
+      "silent_topic": {
+        "name": "ProtoART Silent MQTT-Topic"
       }
     },
     "select": {
@@ -275,6 +302,15 @@
           "frequency": "Frequenzregelung",
           "room_observe": "Raumtemperatur (nur beobachten)",
           "room_auto": "Raumtemperatur (automatisch)"
+        }
+      },
+      "silent_policy": {
+        "name": "Silent-Steuerung",
+        "state": {
+          "disabled": "Nicht steuern",
+          "always_silent": "Immer Silent",
+          "auto": "Automatisch",
+          "normal": "Immer Normal"
         }
       }
     }

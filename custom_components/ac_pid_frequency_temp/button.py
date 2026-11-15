@@ -20,6 +20,8 @@ async def async_setup_entry(
         [
             ResetLearningButton(controller),
             ResetMinHzButton(controller),
+            SilentBoostStartButton(controller),
+            SilentBoostCancelButton(controller),
         ]
     )
 
@@ -44,3 +46,25 @@ class ResetMinHzButton(AcPidFrequencyEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         self.controller.async_reset_min_hz()
+
+
+class SilentBoostStartButton(AcPidFrequencyEntity, ButtonEntity):
+    _attr_icon = "mdi:fire"
+    def __init__(self, controller):
+        super().__init__(controller, "silent_boost_start")
+
+    async def async_press(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+        try:
+            await self.controller.silent_bridge.async_start_boost()
+        except ValueError as exc:
+            raise HomeAssistantError(str(exc)) from exc
+
+
+class SilentBoostCancelButton(AcPidFrequencyEntity, ButtonEntity):
+    _attr_icon = "mdi:fire-off"
+    def __init__(self, controller):
+        super().__init__(controller, "silent_boost_cancel")
+
+    async def async_press(self) -> None:
+        await self.controller.silent_bridge.async_stop_boost()
