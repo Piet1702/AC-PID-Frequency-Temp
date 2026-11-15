@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import math
+from .room_demand_coupling import plan_room_demand
 
 
 @dataclass(frozen=True)
@@ -145,6 +146,10 @@ class RoomAutoController:
         self.latest_min_duration = 0.0
         self.latest_zone = "unknown"
         self.last_learned = False
+        self.demand_forecast_room_45m: float | None = None
+        self.demand_forecast_deficit_k: float | None = None
+        self.demand_aligned_to_actual: bool = False
+        self.demand_actual_hz_anchor: float | None = None
 
     def reset(self) -> None:
         learned = self.continuity
@@ -258,7 +263,7 @@ class RoomAutoController:
         near = room >= target_room_temp - 0.7
         # Der Benutzer kann ab 1 Minute pruefen; die Trendbildung braucht
         # weiterhin echte, zeitlich getrennte BLE-Messwerte.
-        interval = max(1.0, min(120.0, float(observation_window_min) * (2 if near else 1)))
+        interval = max(1.0, min(120.0, float(observation_window_min) * (2 if gap <= 0.25 else 1)))
         if self.last_adjust is None or now < self.last_adjust:
             self.last_adjust = now
         elapsed = (now - self.last_adjust).total_seconds() / 60.0
@@ -283,33 +288,23 @@ class RoomAutoController:
                            if heating else "Noch kein gueltiger Raumtemperaturtrend.",
                            remaining=interval)
         old = self.target_hz
-        gap = target_room_temp - room
-        reason = "Temperaturentwicklung passt; Ziel-Hz beibehalten."
-        if gap <= 0:
-            step_down = 4 if trend > 0.20 else 2
-            self.target_hz = max(preferred, old - step_down)
-            reason = f"Zieltemperatur erreicht: {step_down} Hz vorsichtig reduzieren."
-        elif near:
-            if trend > 0.10:
-                self.target_hz = max(preferred, old - (3 if trend > 0.25 else 2))
-                reason = "Nahe Ziel, Temperatur steigt: Leistung vorzeitig reduzieren."
-            elif trend < -0.03:
-                self.target_hz = min(ceiling, old + 1)
-                reason = "Nahe Ziel, Raum kühlt aus: +1 Hz."
-        elif gap >= 0.8:
-            if trend < 0.04:
-                # 1-min-Testmodus darf NICHT zu minuetlichem Hochregeln fuehren.
-                if self.last_heat_raise is None or now - self.last_heat_raise >= timedelta(minutes=5):
-                    self.target_hz = min(ceiling, old + 2)
-                    self.last_heat_raise = now
-                    reason = "Aufheizen mit langsamem gemessenem Trend: +2 Hz (max. alle 5 min)."
-                else:
-                    reason = "Aufheizen: Trend langsam, 5-Minuten-Sperre fuer neue Hz-Anhebung."
-            elif trend > 0.35:
-                self.target_hz = max(startup, old - 2)
-                reason = "Aufheizen, Trend schnell: vorsichtig reduzieren, nicht unter Start-Hz."
-            else:
-                reason = "Aufheizen: Temperaturentwicklung ausreichend, Start-Hz als Untergrenze."
+        # This call happens only after all BT, temperature, defrost,
+        # overheat and rate-limit checks above have succeeded.
+        plan = plan_room_demand(
+            old_hz=old, actual_hz=actual_hz,
+            room_temp=room, room_target=target_room_temp,
+            trend_kph=float(trend), preferred_hz=preferred, max_hz=ceiling,
+            may_raise=(self.last_heat_raise is None
+                       or now - self.last_heat_raise >= timedelta(minutes=5)),
+        )
+        self.target_hz = plan.target_hz
+        reason = plan.reason
+        self.demand_forecast_room_45m = plan.forecast_room_c
+        self.demand_forecast_deficit_k = plan.forecast_deficit_k
+        self.demand_aligned_to_actual = plan.aligned_to_actual
+        self.demand_actual_hz_anchor = plan.actual_hz_anchor
+        if plan.heat_raise:
+            self.last_heat_raise = now
         self.last_adjust = now
         if self.target_hz > old:
             action = "increase"

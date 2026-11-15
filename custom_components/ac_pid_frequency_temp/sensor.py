@@ -473,6 +473,11 @@ class RoomAutoStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "actual_room_temperature": self.controller.room_observer.snapshot.room_temp,
             "temperature_trend_c_per_h": self.controller.room_observer.snapshot.trend_kph,
             "trend_quality": self.controller.room_observer.snapshot.trend_quality,
+            "forecast_room_temp_45min": self.controller.room_auto.demand_forecast_room_45m,
+            "forecast_room_deficit_45min_k": self.controller.room_auto.demand_forecast_deficit_k,
+            "aligned_target_to_actual_hz": self.controller.room_auto.demand_aligned_to_actual,
+            "actual_hz_at_last_room_decision": self.controller.room_auto.demand_actual_hz_anchor,
+            "coupling_enabled": True,
         }
 
 
