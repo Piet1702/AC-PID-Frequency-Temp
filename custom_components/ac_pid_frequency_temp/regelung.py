@@ -201,7 +201,9 @@ class State:
 
     @learned_min_hz.setter
     def learned_min_hz(self, val: float) -> None:
-        self.learned_min_table[self.current_outdoor_bin] = val
+        self.learned_min_table[self.current_outdoor_bin] = min(
+            self.learned_min_hz, float(val)
+        )
 
     @property
     def learned_min_offset(self) -> float:
@@ -257,14 +259,17 @@ class State:
             for obin in OUTDOOR_BINS:
                 if obin in min_table:
                     try:
-                        self.learned_min_table[obin] = _clamp(float(min_table[obin]), 10.0, 60.0)
+                        self.learned_min_table[obin] = min(
+                            DEFAULT_MIN_HZ_MAP[obin],
+                            _clamp(float(min_table[obin]), 10.0, 60.0),
+                        )
                     except (ValueError, TypeError):
                         pass
         elif "learned_min_hz" in data:
             try:
                 single_min = _clamp(float(data["learned_min_hz"]), 10.0, 60.0)
                 for obin in OUTDOOR_BINS:
-                    self.learned_min_table[obin] = single_min
+                    self.learned_min_table[obin] = min(DEFAULT_MIN_HZ_MAP[obin], single_min)
             except (ValueError, TypeError):
                 pass
 
@@ -357,7 +362,9 @@ def step(
     if user_changed_target or user_changed_setpoint:
         # Mindestmodulation für diese Zone zurücksetzen, damit die Anlage aktiv neu testen darf
         # und ruhig einmalig ausgehen kann zum Neulernen
-        s.learned_min_table[outdoor_bin] = DEFAULT_MIN_HZ_MAP[outdoor_bin]
+        s.learned_min_table[outdoor_bin] = min(
+            s.learned_min_hz, DEFAULT_MIN_HZ_MAP[outdoor_bin]
+        )
         s.min_mod_steady_seconds = 0.0
         s.low_hz_stagnation_count = 0
         s.stable_cycles = 0
@@ -372,7 +379,9 @@ def step(
             s.last_outdoor_temp_learned = outdoor_temp
         elif abs(outdoor_temp - s.last_outdoor_temp_learned) >= p.weather_trigger_delta_k:
             # Kältekreis-Bedingungen haben sich spürbar verändert -> Re-Validierung freigeben
-            s.learned_min_table[outdoor_bin] = DEFAULT_MIN_HZ_MAP[outdoor_bin]
+            s.learned_min_table[outdoor_bin] = min(
+            s.learned_min_hz, DEFAULT_MIN_HZ_MAP[outdoor_bin]
+        )
             s.last_outdoor_temp_learned = outdoor_temp
             s.min_mod_steady_seconds = 0.0
 
@@ -449,9 +458,7 @@ def step(
         ):
             # Der Kompressor lief zuletzt stabil bei last_running_hz und ging beim Versuch
             # weiter abzusenken aus. Die Mindestmodulation ist damit exakt identifiziert!
-            s.learned_min_table[outdoor_bin] = max(
-                DEFAULT_MIN_HZ_MAP[outdoor_bin], round(s.last_running_hz, 1)
-            )
+            # No minimum-Hz update here: shutdown cause is not established.
             s.learned_min_offset_table[outdoor_bin] = max(0.15, s.current_learned_offset)
             s.last_outdoor_temp_learned = outdoor_temp
 
@@ -481,7 +488,13 @@ def step(
             learned_min_hz=s.learned_min_hz,
         )
 
-    # Kompressor läuft: aktuellen Wert merken
+    # A verified running point only lowers the per-zone low-water mark.
+    if (hz >= 10.0 and s.hz_prev1 is not None
+            and abs(hz - s.hz_prev1) <= 0.5
+            and s.stable_cycles >= 2):
+        s.learned_min_table[outdoor_bin] = min(
+            s.learned_min_hz, round(hz, 1)
+        )
     s.last_running_hz = hz
 
     # ==================================================================
@@ -576,12 +589,8 @@ def step(
     if err < -p.deadband_hz and current_offset <= 0.1 and abs(s.trend) < 0.5:
         s.low_hz_stagnation_count += 1
         if s.low_hz_stagnation_count >= 3:
-            s.learned_min_table[outdoor_bin] = max(
-                DEFAULT_MIN_HZ_MAP[outdoor_bin], round(hz, 1)
-            )
-            s.learned_min_offset_table[outdoor_bin] = max(0.1, current_offset)
-            effective_target = s.learned_min_hz
-            err = effective_target - hz
+            # A plateau may be a transient operating point, not a hardware limit.
+            # Preserve the real requested target and let the inner PID lower.
             s.low_hz_stagnation_count = 0
     else:
         s.low_hz_stagnation_count = 0
@@ -602,9 +611,8 @@ def step(
             s.min_mod_steady_seconds += p.interval_s
             if s.min_mod_steady_seconds >= probe_interval_s:
                 # Nach Ablauf der Zeit (Standard 240 min) vorsichtig um 1.0 Hz absenken
-                s.learned_min_table[outdoor_bin] = max(
-                    DEFAULT_MIN_HZ_MAP[outdoor_bin],
-                    s.learned_min_table[outdoor_bin] - 1.0,
+                s.learned_min_table[outdoor_bin] = min(
+                    s.learned_min_hz, round(hz, 1)
                 )
                 s.min_mod_steady_seconds = 0.0
         else:
