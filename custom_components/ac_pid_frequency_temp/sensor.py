@@ -384,6 +384,10 @@ class RoomObservationPhaseSensor(AcPidFrequencyEntity, SensorEntity):
             "physical_minimum_hz_assumed": 20,
             "observed_window_minutes": m.window_minutes,
             "sample_count": m.samples,
+            "trend_quality": m.trend_quality,
+            "trend_quality_reason": m.trend_quality_reason,
+            "trend_window_configured_min": cfg.get("room_trend_window_min", 30.0),
+            "trend_unknown_entries_30m": self.controller.room_observer.trend_unknown_history.unknown_entries_30m(datetime.now(timezone.utc)),
             "sensor_age_seconds": m.input_age_seconds,
             "recovery_seconds_remaining": m.recovery_seconds,
             "observation_only": True,
@@ -468,6 +472,7 @@ class RoomAutoStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "writes_mqtt_power": False,
             "actual_room_temperature": self.controller.room_observer.snapshot.room_temp,
             "temperature_trend_c_per_h": self.controller.room_observer.snapshot.trend_kph,
+            "trend_quality": self.controller.room_observer.snapshot.trend_quality,
         }
 
 

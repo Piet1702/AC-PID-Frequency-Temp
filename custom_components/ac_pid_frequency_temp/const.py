@@ -27,6 +27,9 @@ CONF_MQTT_QOS = "mqtt_qos"
 CONF_MQTT_RETAIN = "mqtt_retain"
 CONF_ROOM_STALE = "room_sensor_stale_s"
 CONF_BT_TIMEOUT_MIN = "bt_contact_timeout_min"
+CONF_BT_LAST_TOPIC = "bt_last_topic"
+CONF_BT_TACT_TOPIC = "bt_tact_topic"
+CONF_ROOM_TREND_WINDOW = "room_trend_window_min"
 # Neue Raumregelungsoptionen (2.4.1.4: NUR BEOBACHTEN)
 CONF_CONTROL_MODE = "control_mode"
 MODE_FREQUENCY = "frequency"
@@ -53,6 +56,7 @@ ROOM_DEFAULTS = {
     CONF_ROOM_OVERHEAT_DELTA: 2.0,
     CONF_ROOM_RESTART_DELTA: 0.5,
     CONF_ROOM_OBSERVE_WINDOW: 1.0,
+    CONF_ROOM_TREND_WINDOW: 30.0,
     CONF_ROOM_MAX_HZ: 40.0,
 }
 MQTT_DEFAULTS = {
@@ -65,6 +69,8 @@ MQTT_DEFAULTS = {
     CONF_MQTT_RETAIN: False,
     CONF_ROOM_STALE: 300,
     CONF_BT_TIMEOUT_MIN: 10.0,
+    CONF_BT_LAST_TOPIC: "",
+    CONF_BT_TACT_TOPIC: "",
 }
 
 # --- Regel-Parameter (auf das absolut notwendige Minimum reduziert) -----------------------

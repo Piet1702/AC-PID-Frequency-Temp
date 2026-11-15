@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from .room_trend_logic import estimate_trend, TrendUnknownHistory
 
 
 PHYSICAL_MIN_HZ = 20.0  # MHI-Anlagenannahme des Anwenders, nur Diagnose in 2.4.1.4
@@ -23,6 +24,8 @@ class RoomObservation:
     room_temp: float | None = None
     delta_k: float | None = None
     trend_kph: float | None = None
+    trend_quality: str = "collecting"
+    trend_quality_reason: str = "Messhistorie wird aufgebaut."
     samples: int = 0
     window_minutes: float = 0.0
     minutes_at_min_hz: float = 0.0
@@ -35,6 +38,7 @@ class RoomObserver:
 
     def __init__(self) -> None:
         self.samples: deque[tuple[datetime, float]] = deque(maxlen=4096)
+        self.trend_unknown_history = TrendUnknownHistory()
         self.last_report: datetime | None = None
         self.had_defrost = False
         self.recover_until: datetime | None = None
@@ -46,6 +50,7 @@ class RoomObserver:
         self.samples.clear()
         self.last_report = None
         self.at_min_since = None
+        self.trend_unknown_history.observe(datetime.now(timezone.utc), True)
         self.snapshot = RoomObservation(
             phase=phase, advice=advice, reason=reason,
             input_age_seconds=age, recovery_seconds=max(0, recovery),
@@ -57,6 +62,7 @@ class RoomObserver:
         sensor_status: str, age_seconds: float | None, heating: bool, defrost: bool,
         actual_hz: float | None, target_temp: float, preferred_hz: float,
         max_overheat_k: float, restart_delta_k: float, window_min: float,
+         trend_window_min: float = 30.0,
     ) -> RoomObservation:
         if defrost:
             self.had_defrost = True
@@ -85,25 +91,15 @@ class RoomObserver:
             self.samples.append((report_at, float(room_temp)))
             self.last_report = report_at
 
-        # Ein älterer Referenzpunkt bleibt erhalten, damit die Steigung exakt
-        # über das konfigurierbare Fenster ermittelt werden kann.
-        # 1-Minuten-Prueftakt ist kein 1-Minuten-Trendfenster.
-        # Mindestens 10 Minuten echte BT-Kontakte fuer den Trend behalten.
-        cutoff = now - timedelta(minutes=max(10.0, float(window_min)))
-        while len(self.samples) > 2 and self.samples[1][0] < cutoff:
+        # Separate 30-Minuten-Trendhistorie, niemals am kurzen Prueftakt ausrichten.
+        cutoff = now - timedelta(minutes=max(15.0, min(90.0, float(trend_window_min))))
+        while len(self.samples) > 1 and self.samples[1][0] < cutoff:
             self.samples.popleft()
-        window = [x for x in self.samples if x[0] >= cutoff]
-        if window and self.samples and self.samples[0][0] < cutoff:
-            window.insert(0, self.samples[0])
-        if len(window) >= 2:
-            elapsed_min = (window[-1][0] - window[0][0]).total_seconds() / 60.0
-        else:
-            elapsed_min = 0.0
-        trend: float | None = None
-        # Nicht aus einzelnen Sprüngen eine scheinbar präzise Stundenrate ableiten.
-        if elapsed_min >= max(10.0, float(window_min) * 0.5):
-            trend = round((window[-1][1] - window[0][1]) * 60.0 / elapsed_min, 3)
-
+        estimate = estimate_trend(self.samples, now=now, window_min=trend_window_min)
+        self.trend_unknown_history.observe(now, estimate.trend_kph is None)
+        trend = estimate.trend_kph
+        quality = estimate.quality
+        elapsed_min = estimate.span_minutes
         if actual_hz is not None and PHYSICAL_MIN_HZ - 0.2 <= actual_hz <= PHYSICAL_MIN_HZ + 0.5:
             if self.at_min_since is None:
                 self.at_min_since = now
@@ -122,6 +118,7 @@ class RoomObserver:
             # Echte, zuvor gemessene Stichproben fuer die naechste Meldung
             # erhalten; bei Abtauung/Heizstopp wird wie bisher geloescht.
             self.at_min_since = None
+            self.trend_unknown_history.observe(now, True)
             self.snapshot = RoomObservation(
                 phase="sensor_unchanged", advice="hold",
                 reason="Noch gueltiger Zahlenwert, aber keine neue BT-Meldung: "
@@ -139,7 +136,7 @@ class RoomObserver:
             reason = f"Zieltemperatur erreicht; niedrigen Dauerbetrieb um {preferred_hz:.0f} Hz prüfen."
         elif float(room_temp) < lower:
             phase = "below_restart"
-            if trend is None:
+            if quality != "reliable":
                 advice = "wait_data"
                 reason = "Deutlich unter Ziel; erst gültiges Messfenster sammeln."
             elif trend < 0.05:
@@ -153,7 +150,7 @@ class RoomObserver:
                 reason = "Raum erwärmt sich moderat; den Arbeitspunkt zunächst halten."
         else:
             phase = "approaching"
-            if trend is None:
+            if quality != "reliable":
                 advice, reason = "wait_data", "Nahe am Ziel; noch kein ausreichend langes Messfenster."
             elif trend > 0.12:
                 advice, reason = "reduce_slowly", "Nahe am Ziel bei steigendem Trend; später frühzeitig drosseln."
@@ -162,7 +159,8 @@ class RoomObserver:
 
         self.snapshot = RoomObservation(
             phase=phase, advice=advice, reason=reason, room_temp=float(room_temp),
-            delta_k=delta, trend_kph=trend, samples=len(window),
+            delta_k=delta, trend_kph=trend, trend_quality=quality,
+             trend_quality_reason=estimate.reason, samples=estimate.samples,
             window_minutes=round(elapsed_min, 1),
             minutes_at_min_hz=round(min_minutes, 1),
             input_age_seconds=age_seconds,

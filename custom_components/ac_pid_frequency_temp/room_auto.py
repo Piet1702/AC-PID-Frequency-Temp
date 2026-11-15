@@ -88,6 +88,7 @@ class ContinuityLearning:
             allowed
             and room is not None and math.isfinite(float(room))
             and trend is not None and math.isfinite(float(trend))
+            and getattr(observation, "trend_quality", "collecting") == "reliable"
             and abs(float(room) - room_target) <= 0.4
             and abs(float(trend)) <= 0.06
             and getattr(observation, "window_minutes", 0.0) >= 25
@@ -269,7 +270,14 @@ class RoomAutoController:
             return deliver("monitoring", "hold", "Temperaturtrend wird beobachtet.", remaining=interval - elapsed)
 
         trend = observation.trend_kph
-        if trend is None or not math.isfinite(float(trend)):
+        if (trend is None or not math.isfinite(float(trend))
+                or getattr(observation, "trend_quality", "collecting") != "reliable"):
+            if room >= target_room_temp and self.target_hz > preferred:
+                self.target_hz = max(preferred, self.target_hz - 2)
+                self.last_adjust = now
+                return deliver("regulating", "decrease",
+                               "Raumziel erreicht: vorsichtig um 2 Hz drosseln, "
+                               "auch ohne verlaesslichen Trend.")
             return deliver("heating" if heating else "collecting", "hold",
                            "Heizbedarf erkannt, aber kein belastbarer BT-Trend: kein blindes Nachregeln."
                            if heating else "Noch kein gueltiger Raumtemperaturtrend.",

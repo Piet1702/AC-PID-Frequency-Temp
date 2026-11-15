@@ -13,7 +13,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 from .bt_heartbeat_logic import BtLastTracker
-from .const import CONF_MQTT_TOPIC, CONF_BT_TIMEOUT_MIN
+from .const import CONF_MQTT_TOPIC, CONF_BT_TIMEOUT_MIN, CONF_BT_LAST_TOPIC, CONF_BT_TACT_TOPIC
 
 _LOGGER = logging.getLogger(__name__)
 _TOPIC = re.compile(r"^(climacontrol/[^/]+)/sensor/external/temperature/set$")
@@ -42,11 +42,14 @@ class ProtoArtBtMonitor:
         self.active = False
 
     async def async_start(self) -> None:
-        topics = bt_topics(self.controller.config.get(CONF_MQTT_TOPIC))
-        if topics is None:
-            self.error = "MQTT-Topic nicht als ProtoART-Temperatur-Topic erkannt"
+        cfg = self.controller.config
+        derived = bt_topics(cfg.get(CONF_MQTT_TOPIC))
+        last = str(cfg.get(CONF_BT_LAST_TOPIC) or "").strip() or (derived[0] if derived else None)
+        tact = str(cfg.get(CONF_BT_TACT_TOPIC) or "").strip() or (derived[1] if derived else None)
+        if not last or not tact:
+            self.error = "BT-Topics fehlen: Haupttopic oder beide BT-Topics konfigurieren"
             return
-        self.topic_last, self.topic_tact = topics
+        self.topic_last, self.topic_tact = last, tact
         try:
             self.unsubs.append(await mqtt.async_subscribe(
                 self.controller.hass, self.topic_last, self._on_last, qos=0))

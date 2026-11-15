@@ -272,6 +272,9 @@
       },
       "bt_contact_timeout": {
         "name": "BT-Kontakt-Timeout"
+      },
+      "room_trend_window": {
+        "name": "Trend-Auswertefenster"
       }
     },
     "switch": {
@@ -305,6 +308,12 @@
       },
       "silent_topic": {
         "name": "ProtoART Silent MQTT-Topic"
+      },
+      "bt_last_topic": {
+        "name": "BT-Kontakt-Topic"
+      },
+      "bt_tact_topic": {
+        "name": "BT-Temperatur-Topic"
       }
     },
     "select": {
