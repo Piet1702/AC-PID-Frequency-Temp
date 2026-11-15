@@ -303,7 +303,7 @@ class MqttLastPublishSensor(AcPidFrequencyEntity, SensorEntity):
 
 class RoomSensorStatusSensor(AcPidFrequencyEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["not_configured", "missing", "invalid", "stale", "ok"]
+    _attr_options = ["not_configured", "missing", "invalid", "stale", "unchanged", "ok"]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:bluetooth-connect"
 
@@ -330,6 +330,8 @@ class RoomSensorStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "age_seconds": round(age, 1) if age is not None else None,
             "last_reported_utc": last_report.isoformat() if last_report else None,
             "stale_after_seconds": cfg.get(CONF_ROOM_STALE),
+            "age_is_only_diagnostic": True,
+            "no_new_report": status == "unchanged",
             "status": status,
         }
 
@@ -358,7 +360,7 @@ class RoomObservationPhaseSensor(AcPidFrequencyEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [
         "collecting", "defrost", "recovery", "sensor_missing", "sensor_stale",
-        "inactive", "below_restart", "approaching", "tolerance", "above_limit",
+        "inactive", "sensor_unchanged", "below_restart", "approaching", "tolerance", "above_limit",
     ]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:chart-timeline-variant"

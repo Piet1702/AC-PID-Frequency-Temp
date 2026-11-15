@@ -67,8 +67,11 @@ def room_sensor_snapshot(hass, entity_id: str | None, stale_after_s: float):
         value_ok = False
     if not value_ok:
         return "invalid", age, timestamp
+    # Change-only BT sensors may stay silent for long periods at a constant
+    # temperature. Silence is not proof of disconnect; keep the numeric value.
+    # The outer loop will hold its Hz and suspend learning until a new report.
     if age is None or age > float(stale_after_s):
-        return "stale", age, timestamp
+        return "unchanged", age, timestamp
     return "ok", age, timestamp
 
 
@@ -130,7 +133,7 @@ class ProtoArtMqttBridge:
             room_id = cfg.get(CONF_ROOM_TEMP)
             stale_after = float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
             room_status, age, _ = room_sensor_snapshot(self.controller.hass, room_id, stale_after)
-            if room_status != "ok":
+            if room_status not in ("ok", "unchanged"):
                 age_note = f" ({age:.0f} s alt)" if age is not None else ""
                 self._set_state(f"room_{room_status}", f"Raumsensor: {room_status}{age_note}")
                 return

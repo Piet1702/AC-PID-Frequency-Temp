@@ -156,7 +156,8 @@
           "missing": "Missing",
           "invalid": "Invalid",
           "stale": "Stale",
-          "ok": "Current"
+          "ok": "Current",
+          "unchanged": "Unchanged temperature (old last report)"
         }
       },
       "room_sensor_age": {
@@ -174,7 +175,8 @@
           "below_restart": "Below restart reference",
           "approaching": "Approaching target",
           "tolerance": "Within overshoot tolerance",
-          "above_limit": "Overshoot limit reached"
+          "above_limit": "Overshoot limit reached",
+          "sensor_unchanged": "Waiting for a new BT temperature report"
         }
       },
       "room_temperature_trend": {

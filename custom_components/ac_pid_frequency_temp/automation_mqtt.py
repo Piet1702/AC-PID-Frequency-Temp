@@ -9,6 +9,7 @@ from datetime import datetime
 import logging
 import math
 from homeassistant.components import mqtt
+from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
@@ -105,6 +106,7 @@ class AutomationMqttMonitor:
             _LOGGER.warning('MQTT Monitoring konnte %s nicht abonnieren: %s', topic, exc)
             self._notify()
 
+    @callback
     def _message_received(self, message) -> None:
         """HA MQTT callback: nur tatsächliche eingetroffene Broker-Nachrichten zählen."""
         if self._closed or self._topic is None or message.topic != self._topic:

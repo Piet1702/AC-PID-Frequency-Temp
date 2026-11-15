@@ -81,7 +81,7 @@
           "mqtt_interval_s": "Sendeintervall (Sekunden)",
           "mqtt_qos": "MQTT QoS",
           "mqtt_retain": "MQTT Retain",
-          "room_sensor_stale_s": "Raumsensor veraltet nach (Sekunden)"
+          "room_sensor_stale_s": "Warnung nach fehlender Temperaturmeldung (Sekunden)"
         },
         "data_description": {
           "mqtt_enabled": "Nur einschalten, wenn die bisherige MQTT-Automation abgeschaltet ist.",
@@ -89,7 +89,7 @@
           "mqtt_interval_s": "Intervall unabhängig vom 60-Sekunden-Frequenzregler; Standard 5 Sekunden.",
           "mqtt_qos": "Standard 0 (Fire-and-forget).",
           "mqtt_retain": "Standard aus: Der Broker soll keinen alten Temperaturwert speichern.",
-          "room_sensor_stale_s": "Sind Raumtemperatur-Meldungen älter, wird nichts mehr veröffentlicht. Standard 300 Sekunden."
+          "room_sensor_stale_s": "Bei aelteren Reports eines gueltigen Zahlenwerts bleibt die Temperatur verfuegbar, aber die automatische Hz-Anhebung und das Lernen werden ausgesetzt. Nicht als sicherer Bluetooth-Ausfallnachweis interpretieren."
         }
       }
     },
@@ -156,7 +156,8 @@
           "missing": "Nicht gefunden",
           "invalid": "Ungültiger Wert",
           "stale": "Veraltet",
-          "ok": "Aktuell"
+          "ok": "Aktuell",
+          "unchanged": "Temperatur unveraendert (letzte Meldung alt)"
         }
       },
       "room_sensor_age": {
@@ -174,7 +175,8 @@
           "below_restart": "Unter Wiedereinschalt-Referenz",
           "approaching": "Annäherung ans Ziel",
           "tolerance": "Innerhalb Überheizungstoleranz",
-          "above_limit": "Überheizungsgrenze erreicht"
+          "above_limit": "Überheizungsgrenze erreicht",
+          "sensor_unchanged": "Warte auf neue BT-Temperaturmeldung"
         }
       },
       "room_temperature_trend": {

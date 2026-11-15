@@ -299,7 +299,7 @@ class AcPidFrequencyController:
         room_state = self.hass.states.get(room_id) if room_id else None
         room_temp = (
             _to_float(room_state.state)
-            if room_state is not None and sensor_status == "ok" else None
+            if room_state is not None and sensor_status in ("ok", "unchanged") else None
         )
         climate = self.hass.states.get(cfg[CONF_CLIMATE])
         heating = climate is not None and climate.state == HVAC_MODE_ACTIVE

@@ -70,7 +70,7 @@ class RoomObserver:
             if remaining > 0:
                 return self._pause("recovery", "paused", "Erholungsphase nach Abtauung: Messfenster zurückgesetzt.", age=age_seconds, recovery=remaining)
             self.recover_until = None
-        if sensor_status != "ok" or room_temp is None or report_at is None:
+        if sensor_status not in ("ok", "unchanged") or room_temp is None or report_at is None:
             phase = "sensor_stale" if sensor_status == "stale" else "sensor_missing"
             return self._pause(phase, "paused", f"Raumsensor nicht auswertbar: {sensor_status}.", age=age_seconds)
         if not heating:
@@ -113,6 +113,22 @@ class RoomObserver:
         delta = round(float(target_temp) - float(room_temp), 2)
         upper = float(target_temp) + float(max_overheat_k)
         lower = float(target_temp) - float(restart_delta_k)
+        if sensor_status == "unchanged":
+            # Keep the real value available (also for MQTT); never manufacture a
+            # zero-degree-per-hour slope from absence of change-only BLE packets.
+            # A later fresh report must begin a new trend window.
+            self.samples.clear()
+            self.last_report = None
+            self.at_min_since = None
+            self.snapshot = RoomObservation(
+                phase="sensor_unchanged", advice="hold",
+                reason="Noch gueltiger Zahlenwert, aber keine neue BT-Meldung: "
+                       "Hz beibehalten, keine Trend-/Lernentscheidung.",
+                room_temp=float(room_temp), delta_k=delta, trend_kph=None,
+                samples=0, window_minutes=0.0, minutes_at_min_hz=0.0,
+                input_age_seconds=age_seconds,
+            )
+            return self.snapshot
         if float(room_temp) >= upper:
             phase, advice = "above_limit", "reduce_slowly"
             reason = "Erlaubte Überheizungsgrenze erreicht; später Wärmeanforderung reduzieren, ohne MQTT-Powerbefehl."

@@ -199,6 +199,18 @@ class RoomAutoController:
             self.heat_suppressed = True
             self.last_adjust = now
             return deliver("heat_pause", "reduce_heat_demand", "Obergrenze erreicht: Wärmeanforderung reduzieren.")
+        if phase == "sensor_unchanged":
+            # Preserve last Hz and any active heat-suppression latch. Still
+            # allow the upper temperature boundary above to take precedence.
+            # Do not restart heating or accumulate 20-Hz/learning evidence.
+            self.continuity.clear_pending()
+            self.last_adjust = now
+            if self.heat_suppressed:
+                return deliver("heat_pause", "reduce_heat_demand",
+                               "Keine neue BT-Meldung: bestehende Heizpause beibehalten.")
+            return deliver("sensor_unchanged", "hold",
+                           "Kein neues BT-Temperaturereignis: Ziel-Hz beibehalten, "
+                           "keine Lernwerte oder 20-Hz-Anhebung.")
         if self.heat_suppressed:
             self.continuity.clear_pending()
             if room > lower:
