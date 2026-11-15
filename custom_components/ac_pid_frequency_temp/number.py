@@ -8,7 +8,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import (
     CONF_MQTT_INTERVAL, CONF_MQTT_QOS, CONF_ROOM_TARGET, CONF_PREFERRED_HZ,
     CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA, CONF_ROOM_OBSERVE_WINDOW,
-    CONF_ROOM_MAX_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD, CONF_SILENT_BOOST_MINUTES,
+    CONF_ROOM_MAX_HZ, CONF_ROOM_START_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD, CONF_SILENT_BOOST_MINUTES,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfFrequency
@@ -24,7 +24,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: AcPidFrequencyController = entry.runtime_data
-    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller)])
+    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomStartHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller)])
 
 
 class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
@@ -141,6 +141,7 @@ class RoomTargetNumber(RoomConfigNumber):
 
 
 class RoomPreferredHzNumber(RoomConfigNumber):
+    """Niedrigste bevorzugte Dauerbetriebs-Hz, nicht Start-Hz."""
     option_key = CONF_PREFERRED_HZ
     _attr_icon = "mdi:sine-wave"
     _attr_native_unit_of_measurement = "Hz"
@@ -150,6 +151,16 @@ class RoomPreferredHzNumber(RoomConfigNumber):
     def __init__(self, controller):
         super().__init__(controller, "room_preferred_hz")
 
+class RoomStartHzNumber(RoomConfigNumber):
+    """Start-Hz bei deutlicher Unterschreitung der Raum-Zieltemperatur."""
+    option_key = CONF_ROOM_START_HZ
+    _attr_icon = "mdi:fire"
+    _attr_native_unit_of_measurement = "Hz"
+    _attr_native_min_value = 20
+    _attr_native_max_value = 90
+    _attr_native_step = 1
+    def __init__(self, controller):
+        super().__init__(controller, "room_start_hz")
 
 class RoomOverheatNumber(RoomConfigNumber):
     option_key = CONF_ROOM_OVERHEAT_DELTA
@@ -185,16 +196,15 @@ class RoomWindowNumber(RoomConfigNumber):
 
 
 class RoomMaxHzNumber(RoomConfigNumber):
-    """Maximal erlaubte automatische Ziel-Hz für die erste Testphase."""
+    """Obergrenze der automatisch angeforderten Ziel-Hz, max. UI-Wert 90."""
     option_key = CONF_ROOM_MAX_HZ
     _attr_icon = "mdi:speedometer"
     _attr_native_unit_of_measurement = "Hz"
     _attr_native_min_value = 20
-    _attr_native_max_value = 60
+    _attr_native_max_value = 90
     _attr_native_step = 1
     def __init__(self, controller):
         super().__init__(controller, "room_max_hz")
-
 
 class RoomMinHzGuardNumber(RoomConfigNumber):
     """Dauer in Minuten bei real gemessenen 20 Hz; 0 deaktiviert den Schutz."""

@@ -71,5 +71,32 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Neue Optionen (Entitäten, Takt, Parameter) durch Neuladen übernehmen."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    """Entitäten/Regeltakt brauchen Reload; Laufzeitoptionen wirken sofort."""
+    from .const import (
+        CONF_CLIMATE, CONF_DEFROST, CONF_FREQUENCY, CONF_INDOOR_UNITS,
+        CONF_OUTDOOR_TEMP, CONF_ROOM_TEMP, CONF_INTERVAL, CONF_CONTROL_MODE,
+    )
+    ctrl = entry.runtime_data
+    if ctrl is None:
+        return
+    previous = ctrl._last_options
+    new_options = dict(entry.options)
+    changed = {k for k in previous.keys() | new_options.keys()
+               if previous.get(k) != new_options.get(k)}
+    ctrl._last_options = new_options
+    if not changed:
+        return
+    needs_reload = {
+        CONF_CLIMATE, CONF_DEFROST, CONF_FREQUENCY, CONF_INDOOR_UNITS,
+        CONF_OUTDOOR_TEMP, CONF_ROOM_TEMP, CONF_INTERVAL,
+    }
+    if changed & needs_reload:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
+    if CONF_CONTROL_MODE in changed:
+        ctrl.async_set_enabled(False)  # Umschalten nur bewusst neu aktivieren
+    else:
+        ctrl._tick()
+    ctrl.mqtt_cadence.reset()
+    ctrl._handle_mqtt_diag_tick(None)
+    ctrl._handle_silent_tick(None)

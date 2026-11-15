@@ -241,7 +241,7 @@
         "name": "Target room temperature"
       },
       "room_preferred_hz": {
-        "name": "Preferred continuous compressor frequency"
+        "name": "Preferred continuous minimum frequency"
       },
       "room_overheat_delta": {
         "name": "Allowed temperature overshoot (+K)"
@@ -260,6 +260,9 @@
       },
       "silent_boost_minutes": {
         "name": "Silent boost duration"
+      },
+      "room_start_hz": {
+        "name": "Heating startup frequency"
       }
     },
     "switch": {

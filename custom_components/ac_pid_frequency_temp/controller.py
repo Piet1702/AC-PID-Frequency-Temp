@@ -68,6 +68,7 @@ from .const import (
 from .regelung import Params, State, round1, step
 from .room_observer import RoomObserver
 from .room_auto import RoomAutoController
+from .mqtt_cadence import MqttCadence
 from .silent_bridge import ProtoArtSilentBridge
 from .protoart_mqtt import room_sensor_snapshot
 from .const import (
@@ -75,7 +76,7 @@ from .const import (
     CONF_PREFERRED_HZ, CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA,
     CONF_ROOM_OBSERVE_WINDOW, CONF_ROOM_STALE, MQTT_DEFAULTS,
     MODE_ROOM_AUTO, CONF_ROOM_MAX_HZ, CONF_MAX_OFFSET, STATUS_ROOM_HEAT_PAUSE,
-    CONF_ROOM_MIN_HZ_GUARD,
+    CONF_ROOM_MIN_HZ_GUARD, CONF_ROOM_START_HZ,
 )
 from .protoart_mqtt import ProtoArtMqttBridge
 
@@ -118,6 +119,8 @@ class AcPidFrequencyController:
         # Regelkern-Zustand (inkl. gelernter Werte)
         self.regelung = State()
         self.mqtt_bridge = ProtoArtMqttBridge(self)
+        self.mqtt_cadence = MqttCadence()
+        self._last_options = dict(entry.options)
         self.room_observer = RoomObserver()
         self.room_auto = RoomAutoController()
         self.silent_bridge = ProtoArtSilentBridge(self)
@@ -185,15 +188,10 @@ class AcPidFrequencyController:
                 )
             )
         self._tick()
-        # MQTT-Takt unabhängig vom Frequenzregler.
-        # Der Diagnosestatus wird auch bei deaktiviertem MQTT aktualisiert.
-        diag_interval = (
-            float(cfg.get(CONF_MQTT_INTERVAL, MQTT_DEFAULTS[CONF_MQTT_INTERVAL]))
-            if self.mqtt_bridge.enabled else 30.0
-        )
+        # 1-s-Prüftakt, Veröffentlichung nur zur konfigurierten Fälligkeit.
+        # Der erste Publish startet sofort; keine 30-s-Diagnose-Startverzögerung.
         self._unsubs.append(async_track_time_interval(
-            self.hass, self._handle_mqtt_diag_tick,
-            timedelta(seconds=max(5.0, diag_interval)),
+            self.hass, self._handle_mqtt_diag_tick, timedelta(seconds=1),
         ))
         self._handle_mqtt_diag_tick(None)
         self._unsubs.append(async_track_time_interval(
@@ -257,8 +255,16 @@ class AcPidFrequencyController:
 
     @callback
     def _handle_mqtt_diag_tick(self, _now: datetime | None) -> None:
-        """MQTT-Sendetakt / Sensordiagnose: 5-60 s unabhängig vom Regler."""
-        self.hass.async_create_task(self.mqtt_bridge.async_tick())
+        """MQTT-Heartbeat: unabhängig vom Hz-Takt und von UI-Konfigurationsänderungen."""
+        cfg = self.config
+        if self.mqtt_cadence.should_send(
+            dt_util.utcnow(), enabled=self.mqtt_bridge.enabled,
+            interval=float(cfg.get(CONF_MQTT_INTERVAL, 5)),
+        ):
+            self.hass.async_create_task(self.mqtt_bridge.async_tick())
+        elif not self.mqtt_bridge.enabled and self.mqtt_bridge.state != "disabled":
+            self.hass.async_create_task(self.mqtt_bridge.async_tick())
+
     @callback
     def _handle_tick(self, _now: datetime) -> None:
         self._tick()
@@ -323,6 +329,7 @@ class AcPidFrequencyController:
             now=dt_util.utcnow(), observation=self.room_observer.snapshot,
             running=self.enabled,
             preferred_hz=float(cfg[CONF_PREFERRED_HZ]),
+            start_hz=float(cfg[CONF_ROOM_START_HZ]),
             max_hz=float(cfg[CONF_ROOM_MAX_HZ]),
             target_room_temp=float(cfg[CONF_ROOM_TARGET]),
             max_overheat_k=float(cfg[CONF_ROOM_OVERHEAT_DELTA]),

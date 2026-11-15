@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timezone
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -132,6 +133,15 @@ class StatusSensor(AcPidFrequencyEntity, SensorEntity):
             "error_entity": lookup("sensor", "frequency_error"),
             "min_hz_entity": lookup("sensor", "learned_min_hz"),
             "target_hz_entity": lookup("number", "target_hz"),
+            "control_mode": cfg.get("control_mode"),
+            "room_target_entity": lookup("number", "room_target"),
+            "room_start_hz_entity": lookup("number", "room_start_hz"),
+            "room_max_hz_entity": lookup("number", "room_max_hz"),
+            "room_preferred_hz_entity": lookup("number", "room_preferred_hz"),
+            "room_auto_status_entity": lookup("sensor", "room_auto_status"),
+            "room_start_hz": cfg.get("room_start_hz"),
+            "room_preferred_hz": cfg.get("room_preferred_hz"),
+            "room_max_hz": cfg.get("room_max_hz"),
             "switch_entity": lookup("switch", "enabled"),
             "reset_min_hz_button_entity": lookup("button", "reset_min_hz"),
             "reset_learning_button_entity": lookup("button", "reset_learning"),
@@ -232,6 +242,8 @@ class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "topic": cfg.get("mqtt_topic"),
             "send_interval_s": cfg.get("mqtt_interval_s"),
             "publish_count": bridge.publish_count,
+            "last_publish_interval_s": bridge.last_interval_s,
+            "last_publish_age_s": round((datetime.now(timezone.utc) - bridge.last_success).total_seconds(), 1) if bridge.last_success else None,
             "last_payload": bridge.last_payload,
             "last_error": bridge.last_error,
             "last_publish_utc": bridge.last_success.isoformat() if bridge.last_success else None,
@@ -411,6 +423,9 @@ class RoomAutoStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "reason": d.reason,
             "action": d.action,
             "calculated_target_hz": d.target_hz,
+            "start_hz": self.controller.config.get("room_start_hz"),
+            "continuous_minimum_hz": self.controller.config.get("room_preferred_hz"),
+            "maximum_hz": self.controller.config.get("room_max_hz"),
             "next_regular_check_min": d.next_check_min,
             "heat_suppressed": d.heat_suppressed,
             "writes_mqtt_power": False,

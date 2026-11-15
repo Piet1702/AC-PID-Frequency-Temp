@@ -72,7 +72,7 @@ class ContinuityLearning:
                 count = int(item["count"])
             except (KeyError, TypeError, ValueError, OverflowError):
                 continue
-            if math.isfinite(hz) and 21.5 <= hz <= 60 and 1 <= count <= 1000:
+            if math.isfinite(hz) and 21.5 <= hz <= 90 and 1 <= count <= 1000:
                 self.learned[zone] = {"hz": round(hz, 2), "count": min(count, 12)}
 
     def observe(
@@ -92,7 +92,7 @@ class ContinuityLearning:
             and abs(float(trend)) <= 0.06
             and getattr(observation, "window_minutes", 0.0) >= 25
             and actual_hz is not None and math.isfinite(actual_hz)
-            and 21.5 <= actual_hz <= 60
+            and 21.5 <= actual_hz <= 90
             and abs(actual_hz - target_hz) <= 3
         )
         if not valid:
@@ -127,7 +127,11 @@ class ContinuityLearning:
 
 
 class RoomAutoController:
-    """Slow, rate-limited room control; defrost and sensor faults always win."""
+    """Äußerer Raumtemperatur-Regler: Start-Hz != dauerhafte Mindest-Hz.
+
+    Berechnet nur Ziel-Hz. Schaltet weder Gerät noch Klima-Solltemperatur um.
+    Begrenzt Änderungen in der Nähe des Sollwerts und setzt während Abtauung aus.
+    """
 
     def __init__(self) -> None:
         self.target_hz: float | None = None
@@ -141,42 +145,34 @@ class RoomAutoController:
         self.last_learned = False
 
     def reset(self) -> None:
-        # A mode switch must not discard long-term learned heat-loss values.
-        continuity = self.continuity
+        learned = self.continuity
         self.__init__()
-        self.continuity = continuity
+        self.continuity = learned
         self.continuity.clear_pending()
 
     def update(
         self, *, now: datetime, observation, running: bool,
-        preferred_hz: float, max_hz: float, target_room_temp: float,
-        max_overheat_k: float, restart_delta_k: float, observation_window_min: float,
-        actual_hz: float | None = None, outdoor_temp: float | None = None,
-        min_hz_guard_minutes: float = 0.0,
+        preferred_hz: float, start_hz: float, max_hz: float,
+        target_room_temp: float, max_overheat_k: float, restart_delta_k: float,
+        observation_window_min: float, actual_hz: float | None = None,
+        outdoor_temp: float | None = None, min_hz_guard_minutes: float = 0.0,
     ) -> AutoDecision:
-        """Return proposed target; never issue physical device commands."""
         if not running:
             self.reset()
             return self.decision
 
-        preferred = max(20.0, min(60.0, float(preferred_hz)))
-        ceiling = max(preferred, min(60.0, float(max_hz)))
+        ceiling = max(20.0, min(90.0, float(max_hz)))
+        preferred = min(ceiling, max(20.0, float(preferred_hz)))
+        startup = max(preferred, min(ceiling, float(start_hz)))
         self.latest_zone = self.continuity.zone(outdoor_temp)
         self.latest_min_duration = float(getattr(observation, "minutes_at_min_hz", 0.0))
         self.last_learned = False
-        if self.target_hz is None or not math.isfinite(self.target_hz):
-            learned = self.continuity.learned_hz(outdoor_temp)
-            # Learned startup values can move the requested Hz at most +2 Hz.
-            self.target_hz = (min(ceiling, preferred + 2, max(preferred, learned))
-                              if learned is not None else preferred)
-            self.last_adjust = now
 
-        def deliver(state, action, reason, *, remaining=None):
+        def deliver(state: str, action: str, reason: str, *, remaining: float | None = None):
             self.decision = AutoDecision(
                 state=state, action=action, reason=reason,
-                target_hz=round(self.target_hz, 1),
-                next_check_min=(round(max(0.0, remaining), 1)
-                                if remaining is not None else None),
+                target_hz=round(self.target_hz, 1) if self.target_hz is not None else None,
+                next_check_min=round(max(0.0, remaining), 1) if remaining is not None else None,
                 heat_suppressed=self.heat_suppressed,
             )
             return self.decision
@@ -185,15 +181,15 @@ class RoomAutoController:
         if phase in ("defrost", "recovery"):
             self.continuity.clear_pending()
             self.last_adjust = now
-            return deliver("paused", "hold", f"{phase}: Trend, Hz-Anpassungen und Lernen pausiert.")
+            return deliver("paused", "hold", "Abtauung/Nachlauf: keine Anpassung oder Lernwerte.")
         if phase in ("sensor_stale", "sensor_missing") or observation.room_temp is None:
             self.continuity.clear_pending()
             self.last_adjust = now
-            return deliver("fault", "blocked", "BT-Raumwert fehlt oder ist zu alt; keine neue Heizanforderung.")
+            return deliver("fault", "blocked", "Raumtemperatur fehlt oder ist veraltet.")
         if phase == "inactive":
             self.continuity.clear_pending()
             self.last_adjust = now
-            return deliver("inactive", "hold", "Klimaanlage nicht im Heizbetrieb; keine Einschaltbefehle.")
+            return deliver("inactive", "hold", "Klimaanlage heizt nicht: keine Einschaltanforderung.")
 
         room = float(observation.room_temp)
         upper = float(target_room_temp) + float(max_overheat_k)
@@ -202,77 +198,80 @@ class RoomAutoController:
             self.continuity.clear_pending()
             self.heat_suppressed = True
             self.last_adjust = now
-            return deliver("heat_pause", "reduce_heat_demand", "Überheizungsgrenze erreicht; keine Dauerlauf-Hz erzwingen.")
+            return deliver("heat_pause", "reduce_heat_demand", "Obergrenze erreicht: Wärmeanforderung reduzieren.")
         if self.heat_suppressed:
             self.continuity.clear_pending()
             if room > lower:
-                return deliver("heat_pause", "reduce_heat_demand", "Noch oberhalb der unteren Wiederanlaufreferenz; Heizanforderung bleibt reduziert.")
+                return deliver("heat_pause", "reduce_heat_demand", "Warte auf untere Hysteresegrenze.")
             self.heat_suppressed = False
             self.target_hz = preferred
             self.last_adjust = now
-            return deliver("resuming", "resume_preferred", "Untere Referenz unterschritten; vorsichtig mit bevorzugten Hz neu anfordern.")
+            return deliver("resuming", "resume_preferred", "Unterhalb Wiederanlaufreferenz: langsam erneut Wärme anfordern.")
+
+        # Startfrequenz nur bei deutlichem Temperaturdefizit verwenden.
+        if self.target_hz is None or not math.isfinite(self.target_hz):
+            gap = target_room_temp - room
+            self.target_hz = startup if gap >= 0.8 else preferred
+            self.last_adjust = now
+            return deliver("starting", "hold", "Start-Hz für kalten Raum gesetzt; erst Temperaturtrend sammeln.")
+        self.target_hz = max(preferred, min(ceiling, self.target_hz))
 
         self.last_learned = self.continuity.observe(
             now=now, observation=observation, actual_hz=actual_hz,
             target_hz=self.target_hz, room_target=target_room_temp,
             outdoor_temp=outdoor_temp, allowed=True,
         )
-
         guard_minutes = max(0.0, min(60.0, float(min_hz_guard_minutes)))
-        # Only act on a *measured* 20-Hz dwell; no invented or inferred frequency.
-        # Three 1-Hz nudges maximum; never in the last 0.3 K before upper limit.
-        guard_ceiling = min(ceiling, preferred + 3.0)
+        guard_ceiling = min(ceiling, preferred + 3)
         if (
-            guard_minutes > 0
-            and self.latest_min_duration >= guard_minutes
+            guard_minutes > 0 and self.latest_min_duration >= guard_minutes
             and actual_hz is not None and 19.8 <= actual_hz <= 20.5
-            and room < upper - 0.3
-            and self.target_hz < guard_ceiling
-            and (self.last_guard is None or (now >= self.last_guard and (now - self.last_guard) >= timedelta(minutes=20)))
+            and room < upper - 0.3 and self.target_hz < guard_ceiling
+            and (self.last_guard is None or
+                 now - self.last_guard >= timedelta(minutes=20))
         ):
-            self.target_hz = min(guard_ceiling, self.target_hz + 1.0)
+            self.target_hz = min(guard_ceiling, self.target_hz + 1)
             self.last_guard = now
             self.last_adjust = now
-            return deliver("min_modulation_guard", "increase", "20 Hz zu lange erreicht: einmalig +1 Hz (max. +3 Hz über Dauerbetriebswert).")
+            return deliver("min_modulation_guard", "increase", "20-Hz-Schutz: +1 Hz, begrenzt auf Dauerwert +3 Hz.")
 
-        near_target = room >= target_room_temp - 0.5
-        minutes = float(observation_window_min) * (2.0 if near_target else 1.0)
-        minutes = min(120.0, max(15.0, minutes))
+        near = room >= target_room_temp - 0.7
+        interval = max(15.0, min(120.0, float(observation_window_min) * (2 if near else 1)))
         if self.last_adjust is None or now < self.last_adjust:
             self.last_adjust = now
         elapsed = (now - self.last_adjust).total_seconds() / 60.0
-        if elapsed < minutes:
-            return deliver("monitoring", "hold", "Beobachtungsintervall läuft; Ziel-Hz bleiben stabil.", remaining=minutes-elapsed)
+        if elapsed < interval:
+            return deliver("monitoring", "hold", "Temperaturtrend wird beobachtet.", remaining=interval - elapsed)
 
         trend = observation.trend_kph
-        if trend is None:
-            return deliver("collecting", "hold", "Noch kein ausreichend langer, gültiger Temperaturtrend.", remaining=5)
-
-        previous = self.target_hz
-        reason = "Heizleistung und Temperaturtrend sind ausreichend stabil."
-        if room >= target_room_temp:
-            self.target_hz = max(preferred, previous - 1.0)
-            reason = "Zieltemperatur erreicht: Leistung in 1-Hz-Schritten an Dauerbetriebswert annähern."
-        elif near_target:
-            if trend > 0.12:
-                self.target_hz = max(preferred, previous - 1.0)
-                reason = "Nahe Zieltemperatur: weiterer Temperaturanstieg erwartet, 1 Hz weniger."
-            elif trend < -0.02:
-                self.target_hz = min(ceiling, previous + 1.0)
-                reason = "Raum kühlt nahe am Ziel ab: vorsichtig 1 Hz mehr."
-        elif trend < 0.05:
-            self.target_hz = min(ceiling, previous + 2.0)
-            reason = "Deutlich unter Ziel, kaum Temperaturanstieg: 2 Hz mehr."
-        elif trend > 0.30:
-            self.target_hz = max(preferred, previous - 1.0)
-            reason = "Aufheizen schneller als erwünscht: 1 Hz weniger."
-
-        self.target_hz = max(preferred, min(ceiling, self.target_hz))
+        if trend is None or not math.isfinite(float(trend)):
+            return deliver("collecting", "hold", "Noch kein gültiger Raumtemperaturtrend.", remaining=5)
+        old = self.target_hz
+        gap = target_room_temp - room
+        reason = "Temperaturentwicklung passt; Ziel-Hz beibehalten."
+        if gap <= 0:
+            step_down = 4 if trend > 0.20 else 2
+            self.target_hz = max(preferred, old - step_down)
+            reason = f"Zieltemperatur erreicht: {step_down} Hz vorsichtig reduzieren."
+        elif near:
+            if trend > 0.10:
+                self.target_hz = max(preferred, old - (3 if trend > 0.25 else 2))
+                reason = "Nahe Ziel, Temperatur steigt: Leistung vorzeitig reduzieren."
+            elif trend < -0.03:
+                self.target_hz = min(ceiling, old + 1)
+                reason = "Nahe Ziel, Raum kühlt aus: +1 Hz."
+        elif gap >= 0.8:
+            if trend < 0.04:
+                self.target_hz = min(ceiling, old + (4 if gap >= 1.5 else 2))
+                reason = "Deutlich unter Ziel, Aufheizung zu langsam: Leistung moderat erhöhen."
+            elif trend > 0.35:
+                self.target_hz = max(preferred, old - 2)
+                reason = "Raum erwärmt sich schnell: -2 Hz gegen Überschwingen."
         self.last_adjust = now
-        if self.target_hz > previous:
+        if self.target_hz > old:
             action = "increase"
-        elif self.target_hz < previous:
+        elif self.target_hz < old:
             action = "decrease"
         else:
             action = "hold"
-        return deliver("controlling", action, reason, remaining=minutes)
+        return deliver("regulating", action, reason)

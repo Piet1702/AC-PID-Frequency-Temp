@@ -241,7 +241,7 @@
         "name": "Ziel-Raumtemperatur"
       },
       "room_preferred_hz": {
-        "name": "Bevorzugte Dauerbetriebsfrequenz"
+        "name": "Bevorzugte Dauerbetriebs-Untergrenze"
       },
       "room_overheat_delta": {
         "name": "Erlaubte Überheizung (+K)"
@@ -260,6 +260,9 @@
       },
       "silent_boost_minutes": {
         "name": "Silent-Boost-Dauer"
+      },
+      "room_start_hz": {
+        "name": "Startfrequenz Aufheizen"
       }
     },
     "switch": {

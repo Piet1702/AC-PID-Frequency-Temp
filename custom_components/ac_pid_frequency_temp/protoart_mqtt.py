@@ -81,6 +81,7 @@ class ProtoArtMqttBridge:
         self.last_error: str | None = None
         self.last_payload: str | None = None
         self.last_success: datetime | None = None
+        self.last_interval_s: float | None = None
         self.publish_count = 0
         self._lock = asyncio.Lock()
         self._stopped = False
@@ -148,6 +149,8 @@ class ProtoArtMqttBridge:
                 self._set_state("mqtt_error", f"{type(exc).__name__}: {str(exc)[:240]}")
                 return
             self.last_payload = payload
-            self.last_success = dt_util.utcnow()
+            now = dt_util.utcnow()
+            self.last_interval_s = round((now - self.last_success).total_seconds(), 2) if self.last_success else None
+            self.last_success = now
             self.publish_count += 1
             self._set_state("sent")

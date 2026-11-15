@@ -17,7 +17,7 @@
  *   show_units: false                    # weitere Innengeräte ausblenden
  */
 
-const HZ_CARD_VERSION = "2.4.3";
+const HZ_CARD_VERSION = "2.4.1.8";
 
 const HZ_I18N = {
   de: {
@@ -37,6 +37,9 @@ const HZ_I18N = {
     },
     unavailable: "Nicht verfügbar", simulated: "Simuliert", real: "Real", outdoor: "Außen", compressor: "Kompressor",
     target_hz: "Ziel-Frequenz", controller: "Hz-Regelung",
+    auto_target_hz: "Automatische Ziel-Hz", room_controller: "Raumtemperaturregelung",
+    room_setpoint: "Raumziel", climate_setpoint: "Klimagerät-Sollwert",
+    room_start_hz: "Aufheizstart", room_cont_hz: "Dauerbetrieb", room_max_hz: "Maximum",
     sensor: "Sensor", offset: "Offset", factor: "Faktor", min_hz: "Min", other_units: "Weitere Innengeräte",
     min_hz_label: "Erlernte Mindest-Hz", reset_min: "Reset", reset_min_title: "Erlernte Mindest-Hz verwerfen und neu lernen",
     passthrough: "echte Raumtemperatur durchgereicht",
@@ -62,6 +65,9 @@ const HZ_I18N = {
     },
     unavailable: "Unavailable", simulated: "Simulated", real: "Real", outdoor: "Outdoor", compressor: "Compressor",
     target_hz: "Target frequency", controller: "Frequency control",
+    auto_target_hz: "Automatic target Hz", room_controller: "Room-temperature control",
+    room_setpoint: "Room target", climate_setpoint: "AC setpoint",
+    room_start_hz: "Heating start", room_cont_hz: "Continuous min", room_max_hz: "Maximum",
     sensor: "Sensor", offset: "Offset", factor: "Factor", min_hz: "Min", other_units: "Other indoor units",
     min_hz_label: "Learned min Hz", reset_min: "Reset", reset_min_title: "Reset learned minimum frequency and re-learn",
     passthrough: "real room temperature passed through",
@@ -174,6 +180,7 @@ const HZ_STYLE = `
   .reset-btn:hover { background: var(--secondary-background-color, rgba(127,127,127,.3)); }
   .reset-btn:active { transform: scale(.96); }
   .reset-btn:disabled { opacity: .4; cursor: default; }
+  button:disabled, input:read-only { opacity: .55; cursor: default; }
   .toggle { width: 46px; height: 26px; border-radius: 13px; border: none; padding: 0; cursor: pointer; position: relative;
             background: var(--switch-unchecked-track-color, rgba(127,127,127,.5)); transition: background .2s; flex: none; }
   .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
@@ -220,6 +227,7 @@ const HZ_TEMPLATE = `
           <div class="target"><span class="int" id="t-int">–</span><span class="dec" id="t-dec"></span><span class="unit" id="t-unit"></span></div>
           <div class="current" id="current"></div>
           <div class="current" id="real"></div>
+          <div class="current" id="climate-setpoint-info" hidden></div>
         </div>
       </div>
 
@@ -262,6 +270,7 @@ const HZ_TEMPLATE = `
           <button class="toggle" id="toggle" role="switch" aria-checked="false"></button>
         </div>
         <div class="detail" id="detail"></div>
+        <div class="detail" id="room-plan" hidden></div>
         <div class="min-hz-row" id="min-hz-row" hidden>
           <div class="min-hz-info">
             <ha-icon icon="mdi:arrow-collapse-down"></ha-icon>
@@ -363,6 +372,7 @@ class AcPidFrequencyCard extends HTMLElement {
     $("hz-plus").addEventListener("click", () => this._bumpNumber("hz", 1));
     const input = $("hz-in");
     input.addEventListener("change", () => {
+      if (this._isRoomMode()) return;
       const value = parseFloat(String(input.value).replace(",", "."));
       if (Number.isFinite(value)) {
         this._pending["hz"] = this._clampNumber("hz", value);
@@ -454,7 +464,12 @@ class AcPidFrequencyCard extends HTMLElement {
     return null;
   }
 
+  _isRoomMode() {
+    const ctrl = this._ctrl();
+    return ["room_auto", "room_observe"].includes(ctrl && ctrl.attributes.control_mode);
+  }
   _tempMeta(climate) {
+    if (this._isRoomMode()) return { min: 16, max: 30, step: .1 };
     const a = climate.attributes;
     const step = Number(a.target_temp_step) || 0.5;
     const min = Number.isFinite(Number(a.min_temp)) ? Number(a.min_temp) : 16;
@@ -498,7 +513,10 @@ class AcPidFrequencyCard extends HTMLElement {
     if (!climate) return;
     const m = this._tempMeta(climate);
     clearTimeout(this._timers["temp-clear"]);
-    const current = Number(climate.attributes.temperature);
+    const ctrl = this._ctrl();
+    const current = this._isRoomMode()
+      ? this._num(this._hass.states[ctrl?.attributes?.room_target_entity])
+      : Number(climate.attributes.temperature);
     const base = this._pending.temp ?? (Number.isFinite(current) ? current : m.min);
     const next = Math.round((base + dir * m.step) / m.step) * m.step;
     this._pending.temp = Math.max(m.min, Math.min(m.max, Number(next.toFixed(2))));
@@ -524,6 +542,7 @@ class AcPidFrequencyCard extends HTMLElement {
   }
 
   _bumpNumber(key, dir) {
+    if (this._isRoomMode()) return;
     const m = this._numberMeta(key);
     if (!m.state) return;
     clearTimeout(this._timers[`${key}-clear`]);
@@ -540,7 +559,10 @@ class AcPidFrequencyCard extends HTMLElement {
     const value = this._pending[key];
     if (value === undefined) return;
     const send = () => {
-      if (key === "temp") {
+      if (key === "temp" && this._isRoomMode()) {
+        const id = this._ctrl()?.attributes?.room_target_entity;
+        if (id) this._hass.callService("number", "set_value", { entity_id: id, value });
+      } else if (key === "temp") {
         this._hass.callService("climate", "set_temperature", {
           entity_id: this._config.entity,
           temperature: value,
@@ -582,9 +604,14 @@ class AcPidFrequencyCard extends HTMLElement {
 
     $("title").textContent = this._config.name || ca.friendly_name || this._config.entity;
 
-    // --- Solltemperatur
+    // --- Zieltemperatur: in Raum-Modi die unabhängige Raumziel-Entität verwenden.
+    const ctrl = this._ctrl();
+    const cAttr = (ctrl && ctrl.attributes) || {};
+    const roomMode = this._isRoomMode();
     const m = this._tempMeta(climate);
-    const target = this._pending.temp ?? (ca.temperature != null ? Number(ca.temperature) : null);
+    const roomSetpoint = this._num(hass.states[cAttr.room_target_entity]);
+    const target = this._pending.temp ?? (roomMode ? roomSetpoint :
+      (ca.temperature != null ? Number(ca.temperature) : null));
     const digits = m.step < 1 ? 1 : 0;
     const unit = (hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || "°C";
     if (target != null && Number.isFinite(target)) {
@@ -607,8 +634,6 @@ class AcPidFrequencyCard extends HTMLElement {
       $("knob").style.display = "none";
     }
 
-    const ctrl = this._ctrl();
-    const cAttr = (ctrl && ctrl.attributes) || {};
     let cur = this._num(hass.states[cAttr.temperature_entity]);
     if (cur == null && ca.current_temperature != null && Number.isFinite(Number(ca.current_temperature))) {
       cur = Number(ca.current_temperature);
@@ -617,6 +642,11 @@ class AcPidFrequencyCard extends HTMLElement {
     const real = this._num(realState);
     $("real").textContent = cAttr.room_temperature_entity
       ? `${t.real} ${real == null ? "–" : this._fmt(real, 1) + " " + unit}`
+      : "";
+    const climateInfo = $("climate-setpoint-info");
+    climateInfo.hidden = !roomMode;
+    climateInfo.textContent = roomMode
+      ? `${t.climate_setpoint}: ${ca.temperature == null ? "–" : this._fmt(ca.temperature, 1) + " " + unit}`
       : "";
     const outState = cAttr.outdoor_temperature_entity && hass.states[cAttr.outdoor_temperature_entity];
     let outdoor = null;
@@ -664,8 +694,8 @@ class AcPidFrequencyCard extends HTMLElement {
     this._updateUnits(t);
 
     $("l-comp").textContent = t.compressor;
-    $("l-target").textContent = t.target_hz;
-    $("l-ctrl").textContent = t.controller;
+    $("l-target").textContent = roomMode ? t.auto_target_hz : t.target_hz;
+    $("l-ctrl").textContent = roomMode ? t.room_controller : t.controller;
     $("l-units").textContent = t.other_units;
     $("more").setAttribute("aria-label", t.more);
   }
@@ -700,6 +730,10 @@ class AcPidFrequencyCard extends HTMLElement {
     input.max = tg.max;
     input.step = tg.step;
     if (this.shadowRoot.activeElement !== input) input.value = tgVal == null ? "" : String(tgVal);
+    const roomMode = this._isRoomMode();
+    input.readOnly = roomMode;
+    $("hz-minus").disabled = roomMode;
+    $("hz-plus").disabled = roomMode;
 
     // Balken: Ist und Ziel (weiß)
     const scale = Math.max(50, (hzNow || 0) * 1.15, (tgVal || 0) * 1.15);
@@ -715,7 +749,10 @@ class AcPidFrequencyCard extends HTMLElement {
     toggle.setAttribute("aria-checked", on ? "true" : "false");
     const status = ctrl.state;
     const statusEl = $("status");
-    statusEl.textContent = t.status[status] || status;
+    const auto = hass.states[ca.room_auto_status_entity];
+    statusEl.textContent = roomMode
+      ? `${t.status[status] || status} · ${auto?.state || "–"}`
+      : (t.status[status] || status);
     statusEl.className = "status" + (status === "fault" ? " err" : status === "waiting" || status === "defrost" || status === "overheat" ? " warn" : "");
 
     // Details zum vorgetäuschten Sensor
@@ -734,6 +771,14 @@ class AcPidFrequencyCard extends HTMLElement {
     }
     $("detail").textContent = parts.join(" · ");
     $("detail").hidden = parts.length === 0;
+    const roomPlan = $("room-plan");
+    roomPlan.hidden = !roomMode;
+    roomPlan.textContent = roomMode ? [
+      `${t.room_start_hz}: ${ca.room_start_hz ?? "–"} Hz`,
+      `${t.room_cont_hz}: ${ca.room_preferred_hz ?? "–"} Hz`,
+      `${t.room_max_hz}: ${ca.room_max_hz ?? "–"} Hz`,
+      auto?.attributes?.reason || "",
+    ].filter(Boolean).join(" · ") : "";
 
     // Mindest-Hz & manueller Reset-Button
     const minRow = $("min-hz-row");
