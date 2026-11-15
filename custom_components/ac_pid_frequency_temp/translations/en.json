@@ -315,6 +315,16 @@
           "auto": "Automatic",
           "normal": "Always normal"
         }
+      },
+      "mqtt_transport": {
+        "name": "MQTT output method",
+        "state": {
+          "direct": "Direct publish",
+          "automation": "HA automation"
+        }
+      },
+      "mqtt_automation": {
+        "name": "MQTT publishing automation"
       }
     }
   }

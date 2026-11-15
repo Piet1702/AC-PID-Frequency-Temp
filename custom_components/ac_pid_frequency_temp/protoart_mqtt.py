@@ -88,7 +88,9 @@ class ProtoArtMqttBridge:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.controller.config.get(CONF_MQTT_ENABLED, False))
+        from .const import CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_DIRECT
+        return (self.controller.config.get(CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_DIRECT) == MQTT_TRANSPORT_DIRECT
+                and bool(self.controller.config.get(CONF_MQTT_ENABLED, False)))
 
     def stop(self) -> None:
         self._stopped = True

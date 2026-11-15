@@ -97,6 +97,8 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
         ctrl.async_set_enabled(False)  # Umschalten nur bewusst neu aktivieren
     else:
         ctrl._tick()
+    if changed & {"mqtt_transport", "mqtt_automation_entity", "mqtt_topic"}:
+        await ctrl.automation_mqtt.async_refresh()
     ctrl.mqtt_cadence.reset()
     ctrl._handle_mqtt_diag_tick(None)
     ctrl._handle_silent_tick(None)

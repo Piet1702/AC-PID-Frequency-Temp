@@ -315,6 +315,16 @@
           "auto": "Automatisch",
           "normal": "Immer Normal"
         }
+      },
+      "mqtt_transport": {
+        "name": "MQTT-Ausgabemethode",
+        "state": {
+          "direct": "Direktversand",
+          "automation": "HA-Automation"
+        }
+      },
+      "mqtt_automation": {
+        "name": "MQTT-Sendeautomatisierung"
       }
     }
   }

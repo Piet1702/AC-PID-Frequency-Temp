@@ -17,6 +17,10 @@ CONF_ROOM_TEMP = "room_temp_entity"  # Echter Raumtemperatursensor (optional)
 CONF_DEFROST = "defrost_entity"  # Abtau-Sensor (optional: binary_sensor oder sensor)
 CONF_INDOOR_UNITS = "indoor_units"  # weitere Innengeräte (nur Anzeige)
 CONF_MQTT_ENABLED = "mqtt_enabled"
+CONF_MQTT_TRANSPORT = "mqtt_transport"
+CONF_MQTT_AUTOMATION = "mqtt_automation_entity"
+MQTT_TRANSPORT_DIRECT = "direct"
+MQTT_TRANSPORT_AUTOMATION = "automation"
 CONF_MQTT_TOPIC = "mqtt_topic"
 CONF_MQTT_INTERVAL = "mqtt_interval_s"
 CONF_MQTT_QOS = "mqtt_qos"
@@ -52,6 +56,8 @@ ROOM_DEFAULTS = {
 }
 MQTT_DEFAULTS = {
     CONF_MQTT_ENABLED: False,
+    CONF_MQTT_TRANSPORT: MQTT_TRANSPORT_DIRECT,
+    CONF_MQTT_AUTOMATION: "",
     CONF_MQTT_TOPIC: "",
     CONF_MQTT_INTERVAL: 5,
     CONF_MQTT_QOS: 0,

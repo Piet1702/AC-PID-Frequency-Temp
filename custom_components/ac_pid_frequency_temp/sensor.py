@@ -216,13 +216,13 @@ class MinHzSensor(AcPidFrequencyEntity, SensorEntity):
 
 
 class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
-    """HA-seitiger Veröffentlichungsstatus (keine ProtoART-Empfangsbestätigung)."""
-
+    """Direkt-Publish oder Broker-Monitoring je nach MQTT-Ausgabemethode."""
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [
         "disabled", "sent", "invalid_topic", "room_not_configured",
-        "room_missing", "room_invalid", "room_stale",
-        "output_unavailable", "mqtt_error", "paused_observe",
+        "room_missing", "room_invalid", "room_stale", "output_unavailable",
+        "mqtt_error", "paused_observe", "monitoring", "receiving", "delayed",
+        "automation_off", "automation_missing", "invalid_payload", "listen_error",
     ]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:message-arrow-right"
@@ -232,16 +232,50 @@ class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
 
     @property
     def native_value(self) -> str:
+        from .const import CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_AUTOMATION
+        if self.controller.config.get(CONF_MQTT_TRANSPORT) == MQTT_TRANSPORT_AUTOMATION:
+            return self.controller.automation_mqtt.status
         return self.controller.mqtt_bridge.state
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        bridge = self.controller.mqtt_bridge
+        from .const import CONF_MQTT_AUTOMATION, CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_AUTOMATION
         cfg = self.controller.config
+        if cfg.get(CONF_MQTT_TRANSPORT) == MQTT_TRANSPORT_AUTOMATION:
+            monitor = self.controller.automation_mqtt
+            eid = cfg.get(CONF_MQTT_AUTOMATION)
+            automation = self.hass.states.get(eid) if eid else None
+            status, room_age, _ = room_sensor_snapshot(
+                self.hass, cfg.get(CONF_ROOM_TEMP),
+                float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
+            )
+            return {
+                "transport": "automation",
+                "topic": cfg.get("mqtt_topic"),
+                "automation_entity": eid,
+                "automation_state": automation.state if automation else "not_found",
+                "automation_last_triggered": str(automation.attributes.get("last_triggered")) if automation and automation.attributes.get("last_triggered") else None,
+                "send_interval_s": cfg.get("mqtt_interval_s"),
+                "publish_count": None,
+                "observed_message_count": monitor.received_count,
+                "observed_invalid_count": monitor.invalid_count,
+                "ignored_retained_count": monitor.ignored_retained,
+                "last_publish_interval_s": monitor.last_interval_s,
+                "last_publish_age_s": round((datetime.now(timezone.utc) - monitor.last_received).total_seconds(), 1) if monitor.last_received else None,
+                "last_payload": monitor.last_payload,
+                "last_error": monitor.last_error,
+                "last_publish_utc": monitor.last_received.isoformat() if monitor.last_received else None,
+                "room_sensor_status": status,
+                "room_report_age_s": round(room_age, 1) if room_age is not None else None,
+                "note": "Paket auf MQTT-Broker beobachtet, Herkunft und ProtoART-Verarbeitung nicht bestätigt."
+            }
+        bridge = self.controller.mqtt_bridge
         return {
+            "transport": "direct",
             "topic": cfg.get("mqtt_topic"),
             "send_interval_s": cfg.get("mqtt_interval_s"),
             "publish_count": bridge.publish_count,
+            "observed_message_count": None,
             "last_publish_interval_s": bridge.last_interval_s,
             "last_publish_age_s": round((datetime.now(timezone.utc) - bridge.last_success).total_seconds(), 1) if bridge.last_success else None,
             "last_payload": bridge.last_payload,
@@ -249,22 +283,23 @@ class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "last_publish_utc": bridge.last_success.isoformat() if bridge.last_success else None,
             "qos": cfg.get("mqtt_qos"),
             "retain": cfg.get("mqtt_retain"),
-            "note": "sent = vom HA-MQTT-Client akzeptiert; keine Empfangsbestätigung des Geräts",
+            "note": "sent = HA MQTT Publish-Aufruf, keine ProtoART-Empfangsbestätigung",
         }
 
 
 class MqttLastPublishSensor(AcPidFrequencyEntity, SensorEntity):
+    """Zeit der letzten Veröffentlichung oder des letzten beobachteten Pakets."""
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:clock-check-outline"
-
     def __init__(self, controller: AcPidFrequencyController) -> None:
         super().__init__(controller, "mqtt_last_publish")
-
     @property
     def native_value(self):
+        from .const import CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_AUTOMATION
+        if self.controller.config.get(CONF_MQTT_TRANSPORT) == MQTT_TRANSPORT_AUTOMATION:
+            return self.controller.automation_mqtt.last_received
         return self.controller.mqtt_bridge.last_success
-
 
 class RoomSensorStatusSensor(AcPidFrequencyEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM

@@ -56,8 +56,7 @@ class EnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
 
 
 class MqttEnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
-    """Live-MQTT-Ausgabe schalten, dauerhaft als Konfigurationsoption speichern."""
-
+    """Im Automationsmodus der echte Zustand von HA automation.on/off."""
     _attr_icon = "mdi:message-arrow-right"
 
     def __init__(self, controller: AcPidFrequencyController) -> None:
@@ -65,12 +64,37 @@ class MqttEnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        return bool(self.controller.config.get(CONF_MQTT_ENABLED, False))
+        from .const import CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_AUTOMATION, CONF_MQTT_AUTOMATION
+        cfg = self.controller.config
+        if cfg.get(CONF_MQTT_TRANSPORT) == MQTT_TRANSPORT_AUTOMATION:
+            eid = cfg.get(CONF_MQTT_AUTOMATION)
+            return bool(eid and self.hass.states.is_state(eid, "on"))
+        return bool(cfg.get(CONF_MQTT_ENABLED, False))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
+        from .const import CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_AUTOMATION, CONF_MQTT_AUTOMATION
+        from .automation_mqtt import valid_automation_id
         cfg = self.controller.config
+        if cfg.get(CONF_MQTT_TRANSPORT) == MQTT_TRANSPORT_AUTOMATION:
+            eid = cfg.get(CONF_MQTT_AUTOMATION)
+            state = self.hass.states.get(eid) if valid_automation_id(eid) else None
+            if state is None or state.state in ("unavailable", "unknown"):
+                raise HomeAssistantError("Zuerst eine vorhandene HA-MQTT-Automation auswählen.")
+            if not valid_publish_topic(str(cfg.get(CONF_MQTT_TOPIC) or "")):
+                raise HomeAssistantError("Zuerst das richtige MQTT-Topic hinterlegen.")
+            # Sicherheit: im Automationsmodus niemals parallel direkt publishen.
+            await self.hass.services.async_call(
+                "automation", "turn_on", {"entity_id": eid}, blocking=True
+            )
+            self.controller.automation_mqtt.tick()
+            return
         if not valid_publish_topic(str(cfg.get(CONF_MQTT_TOPIC) or "")):
             raise HomeAssistantError("MQTT-Topic zuerst konfigurieren.")
+        # Kein doppelter MQTT-Versand bei einer noch aktiven verknüpften Automation.
+        from .const import CONF_MQTT_AUTOMATION
+        aid = cfg.get(CONF_MQTT_AUTOMATION)
+        if aid and self.hass.states.is_state(aid, 'on'):
+            raise HomeAssistantError('Die verknuepfte MQTT-Automation zuerst deaktivieren.')
         if not cfg.get(CONF_ROOM_TEMP):
             raise HomeAssistantError("Echten Raumtemperatursensor zuerst konfigurieren.")
         self.hass.config_entries.async_update_entry(
@@ -79,6 +103,18 @@ class MqttEnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
+        from .const import CONF_MQTT_TRANSPORT, MQTT_TRANSPORT_AUTOMATION, CONF_MQTT_AUTOMATION
+        from .automation_mqtt import valid_automation_id
+        cfg = self.controller.config
+        if cfg.get(CONF_MQTT_TRANSPORT) == MQTT_TRANSPORT_AUTOMATION:
+            eid = cfg.get(CONF_MQTT_AUTOMATION)
+            if not valid_automation_id(eid) or self.hass.states.get(eid) is None:
+                raise HomeAssistantError("Keine gültige HA-Automation gewählt.")
+            await self.hass.services.async_call(
+                "automation", "turn_off", {"entity_id": eid}, blocking=True
+            )
+            self.controller.automation_mqtt.tick()
+            return
         self.hass.config_entries.async_update_entry(
             self.controller.entry,
             options={**self.controller.entry.options, CONF_MQTT_ENABLED: False},

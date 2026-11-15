@@ -79,6 +79,7 @@ from .const import (
     CONF_ROOM_MIN_HZ_GUARD, CONF_ROOM_START_HZ,
 )
 from .protoart_mqtt import ProtoArtMqttBridge
+from .automation_mqtt import AutomationMqttMonitor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ class AcPidFrequencyController:
         # Regelkern-Zustand (inkl. gelernter Werte)
         self.regelung = State()
         self.mqtt_bridge = ProtoArtMqttBridge(self)
+        self.automation_mqtt = AutomationMqttMonitor(self)
         self.mqtt_cadence = MqttCadence()
         self._last_options = dict(entry.options)
         self.room_observer = RoomObserver()
@@ -198,12 +200,14 @@ class AcPidFrequencyController:
             self.hass, self._handle_silent_tick, timedelta(seconds=30),
         ))
         self._handle_silent_tick(None)
+        self.hass.async_create_task(self.automation_mqtt.async_refresh())
 
 
     async def async_shutdown(self) -> None:
         """Zeitgeber stoppen und Zustand sichern."""
         self.mqtt_bridge.stop()
         await self.silent_bridge.async_stop()
+        await self.automation_mqtt.async_stop()
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -257,6 +261,7 @@ class AcPidFrequencyController:
     def _handle_mqtt_diag_tick(self, _now: datetime | None) -> None:
         """MQTT-Heartbeat: unabhängig vom Hz-Takt und von UI-Konfigurationsänderungen."""
         cfg = self.config
+        self.automation_mqtt.tick()
         if self.mqtt_cadence.should_send(
             dt_util.utcnow(), enabled=self.mqtt_bridge.enabled,
             interval=float(cfg.get(CONF_MQTT_INTERVAL, 5)),
