@@ -76,11 +76,11 @@ class RoomObserver:
         if not heating:
             return self._pause("inactive", "paused", "Anlage nicht im Heizbetrieb; keine Heizungstrends berechnen.", age=age_seconds)
 
-        if self.last_report is None or report_at > self.last_report:
+        if sensor_status == "ok" and (self.last_report is None or report_at > self.last_report):
             self.samples.append((report_at, float(room_temp)))
             self.last_report = report_at
         # Bei Zeitrücksprung alte Messreihe verwerfen.
-        elif report_at < self.last_report:
+        elif sensor_status == "ok" and report_at < self.last_report:
             self.samples.clear()
             self.samples.append((report_at, float(room_temp)))
             self.last_report = report_at
@@ -116,9 +116,9 @@ class RoomObserver:
         if sensor_status == "unchanged":
             # Keep the real value available (also for MQTT); never manufacture a
             # zero-degree-per-hour slope from absence of change-only BLE packets.
-            # A later fresh report must begin a new trend window.
-            self.samples.clear()
-            self.last_report = None
+            # Kein neuer BLE-Report: keine neue Trendinformation erfinden.
+            # Echte, zuvor gemessene Stichproben fuer die naechste Meldung
+            # erhalten; bei Abtauung/Heizstopp wird wie bisher geloescht.
             self.at_min_since = None
             self.snapshot = RoomObservation(
                 phase="sensor_unchanged", advice="hold",

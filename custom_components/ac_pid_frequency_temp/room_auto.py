@@ -137,6 +137,7 @@ class RoomAutoController:
         self.target_hz: float | None = None
         self.last_adjust: datetime | None = None
         self.last_guard: datetime | None = None
+        self.last_heat_raise: datetime | None = None
         self.heat_suppressed = False
         self.decision = AutoDecision()
         self.continuity = ContinuityLearning()
@@ -226,7 +227,13 @@ class RoomAutoController:
             self.target_hz = startup if gap >= 0.8 else preferred
             self.last_adjust = now
             return deliver("starting", "hold", "Start-Hz für kalten Raum gesetzt; erst Temperaturtrend sammeln.")
-        self.target_hz = max(preferred, min(ceiling, self.target_hz))
+        # Beim deutlichen Aufheizbedarf bleibt die Startfrequenz die
+        # untere Ziel-Hz-Grenze. Ein real hoeher laufender Kompressor muss
+        # deshalb nicht automatisch heruntergeregelt werden.
+        gap = float(target_room_temp) - room
+        heating = gap >= 0.8
+        self.target_hz = max(startup if heating else preferred,
+                             min(ceiling, self.target_hz))
 
         self.last_learned = self.continuity.observe(
             now=now, observation=observation, actual_hz=actual_hz,
@@ -248,16 +255,25 @@ class RoomAutoController:
             return deliver("min_modulation_guard", "increase", "20-Hz-Schutz: +1 Hz, begrenzt auf Dauerwert +3 Hz.")
 
         near = room >= target_room_temp - 0.7
-        interval = max(15.0, min(120.0, float(observation_window_min) * (2 if near else 1)))
+        # Der Benutzer kann ab 1 Minute pruefen; die Trendbildung braucht
+        # weiterhin echte, zeitlich getrennte BLE-Messwerte.
+        interval = max(1.0, min(120.0, float(observation_window_min) * (2 if near else 1)))
         if self.last_adjust is None or now < self.last_adjust:
             self.last_adjust = now
         elapsed = (now - self.last_adjust).total_seconds() / 60.0
         if elapsed < interval:
+            if heating:
+                return deliver("heating", "hold",
+                               "Aufheizen: Start-Hz als Untergrenze; Ist-Hz darf hoeher liegen.",
+                               remaining=interval - elapsed)
             return deliver("monitoring", "hold", "Temperaturtrend wird beobachtet.", remaining=interval - elapsed)
 
         trend = observation.trend_kph
         if trend is None or not math.isfinite(float(trend)):
-            return deliver("collecting", "hold", "Noch kein gültiger Raumtemperaturtrend.", remaining=5)
+            return deliver("heating" if heating else "collecting", "hold",
+                           "Heizbedarf erkannt, aber kein belastbarer BT-Trend: kein blindes Nachregeln."
+                           if heating else "Noch kein gueltiger Raumtemperaturtrend.",
+                           remaining=interval)
         old = self.target_hz
         gap = target_room_temp - room
         reason = "Temperaturentwicklung passt; Ziel-Hz beibehalten."
@@ -274,11 +290,18 @@ class RoomAutoController:
                 reason = "Nahe Ziel, Raum kühlt aus: +1 Hz."
         elif gap >= 0.8:
             if trend < 0.04:
-                self.target_hz = min(ceiling, old + (4 if gap >= 1.5 else 2))
-                reason = "Deutlich unter Ziel, Aufheizung zu langsam: Leistung moderat erhöhen."
+                # 1-min-Testmodus darf NICHT zu minuetlichem Hochregeln fuehren.
+                if self.last_heat_raise is None or now - self.last_heat_raise >= timedelta(minutes=5):
+                    self.target_hz = min(ceiling, old + 2)
+                    self.last_heat_raise = now
+                    reason = "Aufheizen mit langsamem gemessenem Trend: +2 Hz (max. alle 5 min)."
+                else:
+                    reason = "Aufheizen: Trend langsam, 5-Minuten-Sperre fuer neue Hz-Anhebung."
             elif trend > 0.35:
-                self.target_hz = max(preferred, old - 2)
-                reason = "Raum erwärmt sich schnell: -2 Hz gegen Überschwingen."
+                self.target_hz = max(startup, old - 2)
+                reason = "Aufheizen, Trend schnell: vorsichtig reduzieren, nicht unter Start-Hz."
+            else:
+                reason = "Aufheizen: Temperaturentwicklung ausreichend, Start-Hz als Untergrenze."
         self.last_adjust = now
         if self.target_hz > old:
             action = "increase"

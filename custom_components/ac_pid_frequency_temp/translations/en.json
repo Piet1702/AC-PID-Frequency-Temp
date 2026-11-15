@@ -176,7 +176,8 @@
           "approaching": "Approaching target",
           "tolerance": "Within overshoot tolerance",
           "above_limit": "Overshoot limit reached",
-          "sensor_unchanged": "Waiting for a new BT temperature report"
+          "sensor_unchanged": "Waiting for a new BT temperature report",
+          "heating": "Heating"
         }
       },
       "room_temperature_trend": {
@@ -200,7 +201,10 @@
         "name": "Time at 20 Hz"
       },
       "room_auto_status": {
-        "name": "Adaptive room control – status"
+        "name": "Adaptive room control – status",
+        "state": {
+          "heating": "Heating / monitoring"
+        }
       },
       "room_continuity": {
         "name": "Continuous heating and 20 Hz guard",

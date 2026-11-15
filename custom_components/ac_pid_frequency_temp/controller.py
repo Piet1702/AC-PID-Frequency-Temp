@@ -68,6 +68,7 @@ from .const import (
 from .regelung import Params, State, round1, step
 from .room_observer import RoomObserver
 from .room_auto import RoomAutoController
+from .heating_policy import apply_heating_demand_ceiling
 from .mqtt_cadence import MqttCadence
 from .silent_bridge import ProtoArtSilentBridge
 from .protoart_mqtt import room_sensor_snapshot
@@ -130,6 +131,8 @@ class AcPidFrequencyController:
         # Vom Nutzer einstellbar (per Entität), werden gespeichert
         self.enabled = False
         self.target_hz: float = float(DEFAULT_TARGET_HZ)
+        self.heat_demand_guard_active = False
+        self.heating_simulated_ceiling_c: float | None = None
 
         # Ergebnis des letzten Taktes (für die Entitäten)
         self.status = STATUS_OFF
@@ -386,6 +389,13 @@ class AcPidFrequencyController:
                 else:
                     self.status = STATUS_WAITING
                 return
+            if decision.state == "sensor_unchanged" and not decision.heat_suppressed:
+                # Ohne neue BT-Messung auch den INNEREN PID anhalten! Sonst
+                # kann er die simulierte Temperatur weiter anheben und die
+                # Heizleistung senken, obwohl das Raumziel noch nicht erreicht ist.
+                if self.available and self.output is not None:
+                    self.status = "hold"
+                    return
             if decision.heat_suppressed:
                 # Thermische Hysterese ohne MQTT-Powerbefehl: Heizbedarf herunterfahren.
                 climate_state = self.hass.states.get(cfg[CONF_CLIMATE])
@@ -439,6 +449,8 @@ class AcPidFrequencyController:
         defrost = self._read_defrost(climate if climate_ok else None)
 
         self._fault_since = None
+        previous_simulated_output = (self.output if self.output is not None
+                                     else self.regelung.output)
         result = step(
             self.params,
             self.regelung,
@@ -460,6 +472,29 @@ class AcPidFrequencyController:
         self.offset = result.offset
         self.error_hz = result.error_hz
         self.status = result.mode
+        self.heat_demand_guard_active = False
+        self.heating_simulated_ceiling_c = None
+        if cfg[CONF_CONTROL_MODE] == MODE_ROOM_AUTO and self.enabled:
+            phase = self.room_observer.snapshot.phase
+            # Nur bei wirklich verwertbarem BLE-Wert. Sensor_unchanged
+            # wird oberhalb bereits ohne neue innere Schritte gehalten.
+            if phase not in ("sensor_unchanged", "sensor_missing", "sensor_stale",
+                             "defrost", "recovery", "inactive"):
+                corrected, active, cap = apply_heating_demand_ceiling(
+                    output=self.output, previous_output=previous_simulated_output,
+                    climate_setpoint=setpoint, real_room_temp=room_temp,
+                    room_target=float(cfg[CONF_ROOM_TARGET]), actual_hz=hz,
+                    maximum_hz=float(cfg[CONF_ROOM_MAX_HZ]),
+                    max_offset=float(cfg[CONF_MAX_OFFSET]),
+                )
+                if active:
+                    self.output = corrected
+                    self.regelung.output = corrected
+                    self.offset = round(setpoint - corrected, 2)
+                    self.heat_demand_guard_active = True
+                    self.heating_simulated_ceiling_c = cap
+                    if corrected < result.published:
+                        self.status = "raise"
         _LOGGER.debug(
             "Takt: soll=%.1f hz=%.1f ziel=%.0f (eff=%.1f min=%.1f) -> %s, sensor=%.1f (offset %.2f, gelernt %.2f K [%s/%s])",
             setpoint,

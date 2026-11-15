@@ -176,7 +176,8 @@
           "approaching": "Annäherung ans Ziel",
           "tolerance": "Innerhalb Überheizungstoleranz",
           "above_limit": "Überheizungsgrenze erreicht",
-          "sensor_unchanged": "Warte auf neue BT-Temperaturmeldung"
+          "sensor_unchanged": "Warte auf neue BT-Temperaturmeldung",
+          "heating": "Aufheizen"
         }
       },
       "room_temperature_trend": {
@@ -200,7 +201,10 @@
         "name": "Zeit bei 20 Hz"
       },
       "room_auto_status": {
-        "name": "Adaptive Raumregelung – Status"
+        "name": "Adaptive Raumregelung – Status",
+        "state": {
+          "heating": "Aufheizen / Beobachten"
+        }
       },
       "room_continuity": {
         "name": "Dauerbetrieb und 20-Hz-Schutz",

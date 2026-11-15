@@ -188,9 +188,9 @@ class RoomWindowNumber(RoomConfigNumber):
     option_key = CONF_ROOM_OBSERVE_WINDOW
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_unit_of_measurement = "min"
-    _attr_native_min_value = 15
+    _attr_native_min_value = 1
     _attr_native_max_value = 60
-    _attr_native_step = 5
+    _attr_native_step = 1
     def __init__(self, controller):
         super().__init__(controller, "room_observation_window")
 

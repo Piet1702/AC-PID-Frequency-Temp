@@ -127,6 +127,8 @@ class StatusSensor(AcPidFrequencyEntity, SensorEntity):
             "learned_reaction_time": self.controller.regelung.learned_reaction_time,
             "learned_sensitivity": self.controller.regelung.learned_sensitivity,
             "effective_target_hz": self.controller.regelung.effective_target_hz,
+            "heat_demand_guard_active": self.controller.heat_demand_guard_active,
+            "heating_simulated_ceiling_c": self.controller.heating_simulated_ceiling_c,
             "temperature_entity": lookup("sensor", "temperature"),
             "offset_entity": lookup("sensor", "offset"),
             "factor_entity": lookup("sensor", "learning_factor"),
@@ -360,7 +362,7 @@ class RoomObservationPhaseSensor(AcPidFrequencyEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [
         "collecting", "defrost", "recovery", "sensor_missing", "sensor_stale",
-        "inactive", "sensor_unchanged", "below_restart", "approaching", "tolerance", "above_limit",
+        "inactive", "sensor_unchanged", "heating", "below_restart", "approaching", "tolerance", "above_limit",
     ]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:chart-timeline-variant"
