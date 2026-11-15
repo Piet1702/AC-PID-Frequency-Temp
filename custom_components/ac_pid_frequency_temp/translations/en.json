@@ -269,6 +269,9 @@
       },
       "room_start_hz": {
         "name": "Heating startup frequency"
+      },
+      "bt_contact_timeout": {
+        "name": "BT contact timeout"
       }
     },
     "switch": {

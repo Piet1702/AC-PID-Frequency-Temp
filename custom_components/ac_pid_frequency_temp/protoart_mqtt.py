@@ -132,7 +132,7 @@ class ProtoArtMqttBridge:
             # darf per MQTT an die Anlage gelangen.
             room_id = cfg.get(CONF_ROOM_TEMP)
             stale_after = float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
-            room_status, age, _ = room_sensor_snapshot(self.controller.hass, room_id, stale_after)
+            room_status, age, _ = self.controller.room_input_snapshot()
             if room_status not in ("ok", "unchanged"):
                 age_note = f" ({age:.0f} s alt)" if age is not None else ""
                 self._set_state(f"room_{room_status}", f"Raumsensor: {room_status}{age_note}")

@@ -81,6 +81,7 @@ from .const import (
 )
 from .protoart_mqtt import ProtoArtMqttBridge
 from .automation_mqtt import AutomationMqttMonitor
+from .bt_heartbeat import ProtoArtBtMonitor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ class AcPidFrequencyController:
         self.regelung = State()
         self.mqtt_bridge = ProtoArtMqttBridge(self)
         self.automation_mqtt = AutomationMqttMonitor(self)
+        self.bt_monitor = ProtoArtBtMonitor(self)
         self.mqtt_cadence = MqttCadence()
         self._last_options = dict(entry.options)
         self.room_observer = RoomObserver()
@@ -204,6 +206,7 @@ class AcPidFrequencyController:
         ))
         self._handle_silent_tick(None)
         self.hass.async_create_task(self.automation_mqtt.async_refresh())
+        self.hass.async_create_task(self.bt_monitor.async_start())
 
 
     async def async_shutdown(self) -> None:
@@ -211,6 +214,7 @@ class AcPidFrequencyController:
         self.mqtt_bridge.stop()
         await self.silent_bridge.async_stop()
         await self.automation_mqtt.async_stop()
+        await self.bt_monitor.async_stop()
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -292,13 +296,35 @@ class AcPidFrequencyController:
         if self.status in (STATUS_OFF, STATUS_IDLE):
             self._tick()
 
-    def _update_room_observer(self) -> None:
-        """Nur HA-Zustände lesen, die Anlage niemals aktiv steuern."""
+    def room_input_snapshot(self):
+        """Numerischer HA-Wert + separates BT-Kontakt-Signal.
+
+        Ein MQTT-Last-Reset aktualisiert nur den glaubhaften Messzeitpunkt,
+        niemals künstlich einen HA-State. Ohne Reset zuerst sicher halten und
+        nach dem einstellbaren Timeout abbrechen.
+        """
         cfg = self.config
         room_id = cfg.get(CONF_ROOM_TEMP)
-        sensor_status, sensor_age, report_at = room_sensor_snapshot(
-            self.hass, room_id, float(cfg[CONF_ROOM_STALE])
-        )
+        status, ha_age, ha_report = room_sensor_snapshot(
+            self.hass, room_id, float(cfg[CONF_ROOM_STALE]))
+        if status not in ("ok", "unchanged"):
+            return status, ha_age, ha_report
+        bt_state = self.bt_monitor.state()
+        if bt_state == "confirmed":
+            contact = self.bt_monitor.tracker.contact_at
+            return "ok", self.bt_monitor.tracker.contact_age(dt_util.utcnow()), contact
+        if bt_state == "timeout":
+            return "stale", self.bt_monitor.timeout_seconds() + 1, ha_report
+        if bt_state == "waiting":
+            return "unchanged", ha_age, ha_report
+        # Kein erkennbares ProtoART-Topic bzw. kein MQTT: alte sichere Regel.
+        return status, ha_age, ha_report
+
+    def _update_room_observer(self) -> None:
+        """Raumtrend nur aus bestaetigten BT-Kontakten ableiten."""
+        cfg = self.config
+        room_id = cfg.get(CONF_ROOM_TEMP)
+        sensor_status, sensor_age, report_at = self.room_input_snapshot()
         room_state = self.hass.states.get(room_id) if room_id else None
         room_temp = (
             _to_float(room_state.state)

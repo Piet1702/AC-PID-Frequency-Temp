@@ -247,10 +247,7 @@ class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
             monitor = self.controller.automation_mqtt
             eid = cfg.get(CONF_MQTT_AUTOMATION)
             automation = self.hass.states.get(eid) if eid else None
-            status, room_age, _ = room_sensor_snapshot(
-                self.hass, cfg.get(CONF_ROOM_TEMP),
-                float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
-            )
+            status, room_age, _ = self.controller.room_input_snapshot()
             return {
                 "transport": "automation",
                 "topic": cfg.get("mqtt_topic"),
@@ -269,6 +266,7 @@ class MqttStatusSensor(AcPidFrequencyEntity, SensorEntity):
                 "last_publish_utc": monitor.last_received.isoformat() if monitor.last_received else None,
                 "room_sensor_status": status,
                 "room_report_age_s": round(room_age, 1) if room_age is not None else None,
+                "bt_heartbeat_status": self.controller.bt_monitor.state(),
                 "note": "Paket auf MQTT-Broker beobachtet, Herkunft und ProtoART-Verarbeitung nicht bestätigt."
             }
         bridge = self.controller.mqtt_bridge
@@ -314,10 +312,7 @@ class RoomSensorStatusSensor(AcPidFrequencyEntity, SensorEntity):
 
     def _snapshot(self):
         cfg = self.controller.config
-        return room_sensor_snapshot(
-            self.controller.hass, cfg.get(CONF_ROOM_TEMP),
-            float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
-        )
+        return self.controller.room_input_snapshot()
 
     @property
     def native_value(self) -> str:
@@ -327,10 +322,16 @@ class RoomSensorStatusSensor(AcPidFrequencyEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         status, age, last_report = self._snapshot()
         cfg = self.controller.config
+        _, ha_report_age, ha_report_at = room_sensor_snapshot(
+            self.controller.hass, cfg.get(CONF_ROOM_TEMP),
+            float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
+        )
         return {
+            **self.controller.bt_monitor.snapshot_attrs(),
             "source_entity": cfg.get(CONF_ROOM_TEMP),
             "age_seconds": round(age, 1) if age is not None else None,
-            "last_reported_utc": last_report.isoformat() if last_report else None,
+            "last_reported_utc": ha_report_at.isoformat() if ha_report_at else None,
+            "ha_report_age_seconds": round(ha_report_age, 1) if ha_report_age is not None else None,
             "stale_after_seconds": cfg.get(CONF_ROOM_STALE),
             "age_is_only_diagnostic": True,
             "no_new_report": status == "unchanged",
@@ -350,10 +351,7 @@ class RoomSensorAgeSensor(AcPidFrequencyEntity, SensorEntity):
     @property
     def native_value(self) -> float | None:
         cfg = self.controller.config
-        _, age, _ = room_sensor_snapshot(
-            self.controller.hass, cfg.get(CONF_ROOM_TEMP),
-            float(cfg.get(CONF_ROOM_STALE, MQTT_DEFAULTS[CONF_ROOM_STALE]))
-        )
+        _, age, _ = self.controller.room_input_snapshot()
         return round(age, 1) if age is not None else None
 
 

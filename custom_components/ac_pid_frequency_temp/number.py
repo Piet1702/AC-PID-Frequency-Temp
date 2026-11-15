@@ -8,7 +8,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import (
     CONF_MQTT_INTERVAL, CONF_MQTT_QOS, CONF_ROOM_TARGET, CONF_PREFERRED_HZ,
     CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA, CONF_ROOM_OBSERVE_WINDOW,
-    CONF_ROOM_MAX_HZ, CONF_ROOM_START_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD, CONF_SILENT_BOOST_MINUTES,
+    CONF_ROOM_MAX_HZ, CONF_ROOM_START_HZ, CONF_CONTROL_MODE, MODE_ROOM_AUTO, CONF_ROOM_MIN_HZ_GUARD, CONF_SILENT_BOOST_MINUTES, CONF_BT_TIMEOUT_MIN,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfFrequency
@@ -24,7 +24,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: AcPidFrequencyController = entry.runtime_data
-    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomStartHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller)])
+    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomStartHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller), BtContactTimeoutNumber(controller)])
 
 
 class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
@@ -229,3 +229,16 @@ class SilentBoostMinutesNumber(RoomConfigNumber):
 
     def __init__(self, controller):
         super().__init__(controller, "silent_boost_minutes")
+
+
+class BtContactTimeoutNumber(RoomConfigNumber):
+    """Timeout without a confirmed counter reset; not a temperature-change timeout."""
+    option_key = CONF_BT_TIMEOUT_MIN
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:bluetooth-off"
+    _attr_native_unit_of_measurement = "min"
+    _attr_native_min_value = 2
+    _attr_native_max_value = 120
+    _attr_native_step = 1
+    def __init__(self, controller):
+        super().__init__(controller, "bt_contact_timeout")

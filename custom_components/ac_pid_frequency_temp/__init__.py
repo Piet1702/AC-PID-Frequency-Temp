@@ -74,7 +74,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
     """Entitäten/Regeltakt brauchen Reload; Laufzeitoptionen wirken sofort."""
     from .const import (
         CONF_CLIMATE, CONF_DEFROST, CONF_FREQUENCY, CONF_INDOOR_UNITS,
-        CONF_OUTDOOR_TEMP, CONF_ROOM_TEMP, CONF_INTERVAL, CONF_CONTROL_MODE,
+        CONF_OUTDOOR_TEMP, CONF_ROOM_TEMP, CONF_INTERVAL, CONF_CONTROL_MODE, CONF_MQTT_TOPIC,
     )
     ctrl = entry.runtime_data
     if ctrl is None:
@@ -88,7 +88,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
         return
     needs_reload = {
         CONF_CLIMATE, CONF_DEFROST, CONF_FREQUENCY, CONF_INDOOR_UNITS,
-        CONF_OUTDOOR_TEMP, CONF_ROOM_TEMP, CONF_INTERVAL,
+        CONF_OUTDOOR_TEMP, CONF_ROOM_TEMP, CONF_INTERVAL, CONF_MQTT_TOPIC,
     }
     if changed & needs_reload:
         await hass.config_entries.async_reload(entry.entry_id)

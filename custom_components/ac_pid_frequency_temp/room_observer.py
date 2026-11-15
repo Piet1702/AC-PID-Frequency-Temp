@@ -87,7 +87,9 @@ class RoomObserver:
 
         # Ein älterer Referenzpunkt bleibt erhalten, damit die Steigung exakt
         # über das konfigurierbare Fenster ermittelt werden kann.
-        cutoff = now - timedelta(minutes=float(window_min))
+        # 1-Minuten-Prueftakt ist kein 1-Minuten-Trendfenster.
+        # Mindestens 10 Minuten echte BT-Kontakte fuer den Trend behalten.
+        cutoff = now - timedelta(minutes=max(10.0, float(window_min)))
         while len(self.samples) > 2 and self.samples[1][0] < cutoff:
             self.samples.popleft()
         window = [x for x in self.samples if x[0] >= cutoff]
