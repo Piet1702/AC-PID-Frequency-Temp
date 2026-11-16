@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import math
 from .room_demand_coupling import plan_room_demand
+from .room_dual_trend import (
+    control_trend, fast_brake, reduced_target, FAST_BRAKE_COOLDOWN_MIN,
+)
 
 
 @dataclass(frozen=True)
@@ -155,6 +158,14 @@ class RoomAutoController:
         self.demand_requested_rate_kph: float | None = None
         self.demand_rate_error_kph: float | None = None
         self.demand_remaining_heatup_min: float | None = None
+        # Values actually used at the LAST Hz decision, not the live trend.
+        self.last_decision_trend_kph: float | None = None
+        self.last_decision_trend_source: str | None = None
+        self.last_decision_time: datetime | None = None
+        self.last_decision_room_c: float | None = None
+        self.last_fast_brake_at: datetime | None = None
+        self.fast_brake_qualified: bool = False
+        self.fast_brake_reason: str | None = None
 
     def reset(self) -> None:
         learned = self.continuity
@@ -281,6 +292,59 @@ class RoomAutoController:
         if self.last_adjust is None or now < self.last_adjust:
             self.last_adjust = now
         elapsed = (now - self.last_adjust).total_seconds() / 60.0
+        # Safety paths (BT fault, defrost, upper limit) were checked above.
+        # Independent short-horizon brake: never increases the Hz target.
+        brake = fast_brake(
+            room_c=room, target_c=float(target_room_temp),
+            short_kph=getattr(observation, "short_trend_kph", None),
+            short_quality=getattr(observation, "short_trend_quality", "collecting"),
+        )
+        self.fast_brake_qualified = brake.active
+        self.fast_brake_reason = brake.reason
+        brake_due = (
+            self.last_fast_brake_at is None or now < self.last_fast_brake_at
+            or (now - self.last_fast_brake_at).total_seconds() >= 60.0 * FAST_BRAKE_COOLDOWN_MIN
+        )
+        if brake.active and brake_due and self.target_hz > preferred + 0.05:
+            old = self.target_hz
+            next_hz = reduced_target(
+                old_hz=old, actual_hz=actual_hz, preferred_hz=preferred,
+            )
+            if next_hz < old - 0.05:
+                self.target_hz = next_hz
+                self.last_fast_brake_at = now
+                self.last_adjust = now
+                self.last_decision_trend_kph = getattr(observation, "short_trend_kph", None)
+                self.last_decision_trend_source = "short_brake" if self.last_decision_trend_kph is not None else "target_reached"
+                self.last_decision_time = now
+                self.last_decision_room_c = room
+                # Keep displayed forecast and used slope from the same instant.
+                decision_trend = self.last_decision_trend_kph
+                if decision_trend is not None and math.isfinite(float(decision_trend)):
+                    self.demand_forecast_room_45m = round(room + max(-1.5, min(1.5, float(decision_trend))) * 0.75, 3)
+                    self.demand_forecast_deficit_k = round(target_room_temp - self.demand_forecast_room_45m, 3)
+                else:
+                    self.demand_forecast_room_45m = None
+                    self.demand_forecast_deficit_k = None
+                # Keep *all* decision diagnostics on the same snapshot.
+                self.demand_aligned_to_actual = (next_hz < max(preferred, old - 2.0) - 0.05)
+                self.demand_actual_hz_anchor = actual_hz
+                if heatup_duration_min is not None:
+                    remain = max(45.0, float(heatup_duration_min) - self.heatup_elapsed_min)
+                    desired = max(0.0, min(1.5, (float(target_room_temp) - room) * 60.0 / remain))
+                    self.demand_requested_rate_kph = round(desired, 3)
+                    self.demand_remaining_heatup_min = round(remain, 2)
+                    self.demand_rate_error_kph = (
+                        round(desired - float(decision_trend), 3)
+                        if decision_trend is not None and math.isfinite(float(decision_trend)) else None
+                    )
+                return deliver("regulating", "decrease",
+                               "Schnellbremse (15 Min): Ziel-Hz vorzeitig reduziert; "
+                               "30-Minuten-Regelung darf nicht blind wieder anheben.")
+        if brake.active:
+            return deliver("monitoring", "hold",
+                           "Schnellbremse aktiv: keine Heizleistungsanhebung; "
+                           "Kompressorreaktion bzw. naechsten Bremsimpuls abwarten.")
         if elapsed < interval:
             if heating:
                 return deliver("heating", "hold",
@@ -288,9 +352,11 @@ class RoomAutoController:
                                remaining=interval - elapsed)
             return deliver("monitoring", "hold", "Temperaturtrend wird beobachtet.", remaining=interval - elapsed)
 
-        trend = observation.trend_kph
+        # Long-term trend for ordinary heating, 15-min as startup fallback.
+        baseline = control_trend(observation)
+        trend = baseline.rate_kph
         if (trend is None or not math.isfinite(float(trend))
-                or getattr(observation, "trend_quality", "collecting") != "reliable"):
+                or baseline.quality != "reliable"):
             if room >= target_room_temp and self.target_hz > preferred:
                 self.target_hz = max(preferred, self.target_hz - 2)
                 self.last_adjust = now
@@ -322,6 +388,10 @@ class RoomAutoController:
         self.demand_requested_rate_kph = plan.target_rate_kph
         self.demand_rate_error_kph = plan.rate_error_kph
         self.demand_remaining_heatup_min = plan.heatup_remaining_min
+        self.last_decision_trend_kph = float(trend)
+        self.last_decision_trend_source = baseline.source
+        self.last_decision_time = now
+        self.last_decision_room_c = room
         if plan.heat_raise:
             self.last_heat_raise = now
         self.last_adjust = now

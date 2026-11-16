@@ -14,7 +14,7 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Piet1702/AC-PID-Frequency-Temp/issues",
   "requirements": [],
-  "version": "2.4.1.16",
+  "version": "2.4.1.17",
   "after_dependencies": [
     "mqtt"
   ]
