@@ -275,6 +275,9 @@
       },
       "room_trend_window": {
         "name": "Trend analysis window"
+      },
+      "room_heatup_duration": {
+        "name": "Desired heat-up duration"
       }
     },
     "switch": {

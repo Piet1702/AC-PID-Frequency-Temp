@@ -30,6 +30,7 @@ CONF_BT_TIMEOUT_MIN = "bt_contact_timeout_min"
 CONF_BT_LAST_TOPIC = "bt_last_topic"
 CONF_BT_TACT_TOPIC = "bt_tact_topic"
 CONF_ROOM_TREND_WINDOW = "room_trend_window_min"
+CONF_ROOM_HEATUP_DURATION = "room_heatup_duration_min"
 # Neue Raumregelungsoptionen (2.4.1.4: NUR BEOBACHTEN)
 CONF_CONTROL_MODE = "control_mode"
 MODE_FREQUENCY = "frequency"
@@ -57,6 +58,7 @@ ROOM_DEFAULTS = {
     CONF_ROOM_RESTART_DELTA: 0.5,
     CONF_ROOM_OBSERVE_WINDOW: 1.0,
     CONF_ROOM_TREND_WINDOW: 30.0,
+    CONF_ROOM_HEATUP_DURATION: 150.0,
     CONF_ROOM_MAX_HZ: 40.0,
 }
 MQTT_DEFAULTS = {

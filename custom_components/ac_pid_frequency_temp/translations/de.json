@@ -275,6 +275,9 @@
       },
       "room_trend_window": {
         "name": "Trend-Auswertefenster"
+      },
+      "room_heatup_duration": {
+        "name": "Gewünschte Aufheizdauer"
       }
     },
     "switch": {

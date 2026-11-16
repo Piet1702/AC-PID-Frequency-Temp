@@ -478,6 +478,11 @@ class RoomAutoStatusSensor(AcPidFrequencyEntity, SensorEntity):
             "aligned_target_to_actual_hz": self.controller.room_auto.demand_aligned_to_actual,
             "actual_hz_at_last_room_decision": self.controller.room_auto.demand_actual_hz_anchor,
             "coupling_enabled": True,
+            "requested_heatup_duration_min": self.controller.config.get("room_heatup_duration_min"),
+            "elapsed_heatup_min": round(self.controller.room_auto.heatup_elapsed_min, 1),
+            "remaining_heatup_min": self.controller.room_auto.demand_remaining_heatup_min,
+            "desired_warming_rate_kph": self.controller.room_auto.demand_requested_rate_kph,
+            "warming_rate_error_kph": self.controller.room_auto.demand_rate_error_kph,
         }
 
 

@@ -75,7 +75,7 @@ from .protoart_mqtt import room_sensor_snapshot
 from .const import (
     ROOM_DEFAULTS, CONF_CONTROL_MODE, MODE_ROOM_OBSERVE, CONF_ROOM_TARGET,
     CONF_PREFERRED_HZ, CONF_ROOM_OVERHEAT_DELTA, CONF_ROOM_RESTART_DELTA,
-    CONF_ROOM_OBSERVE_WINDOW, CONF_ROOM_TREND_WINDOW, CONF_ROOM_STALE, MQTT_DEFAULTS,
+    CONF_ROOM_OBSERVE_WINDOW, CONF_ROOM_TREND_WINDOW, CONF_ROOM_HEATUP_DURATION, CONF_ROOM_STALE, MQTT_DEFAULTS,
     MODE_ROOM_AUTO, CONF_ROOM_MAX_HZ, CONF_MAX_OFFSET, STATUS_ROOM_HEAT_PAUSE,
     CONF_ROOM_MIN_HZ_GUARD, CONF_ROOM_START_HZ,
 )
@@ -370,6 +370,7 @@ class AcPidFrequencyController:
             max_overheat_k=float(cfg[CONF_ROOM_OVERHEAT_DELTA]),
             restart_delta_k=float(cfg[CONF_ROOM_RESTART_DELTA]),
             observation_window_min=float(cfg[CONF_ROOM_OBSERVE_WINDOW]),
+            heatup_duration_min=float(cfg[CONF_ROOM_HEATUP_DURATION]),
             actual_hz=(
                 _to_float(freq_state.state)
                 if (freq_state := self.hass.states.get(cfg[CONF_FREQUENCY])) is not None

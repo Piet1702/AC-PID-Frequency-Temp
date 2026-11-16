@@ -150,6 +150,11 @@ class RoomAutoController:
         self.demand_forecast_deficit_k: float | None = None
         self.demand_aligned_to_actual: bool = False
         self.demand_actual_hz_anchor: float | None = None
+        self.heatup_started_at: datetime | None = None
+        self.heatup_elapsed_min: float = 0.0
+        self.demand_requested_rate_kph: float | None = None
+        self.demand_rate_error_kph: float | None = None
+        self.demand_remaining_heatup_min: float | None = None
 
     def reset(self) -> None:
         learned = self.continuity
@@ -161,7 +166,7 @@ class RoomAutoController:
         self, *, now: datetime, observation, running: bool,
         preferred_hz: float, start_hz: float, max_hz: float,
         target_room_temp: float, max_overheat_k: float, restart_delta_k: float,
-        observation_window_min: float, actual_hz: float | None = None,
+        observation_window_min: float, heatup_duration_min: float | None = None, actual_hz: float | None = None,
         outdoor_temp: float | None = None, min_hz_guard_minutes: float = 0.0,
     ) -> AutoDecision:
         if not running:
@@ -199,6 +204,15 @@ class RoomAutoController:
             return deliver("inactive", "hold", "Klimaanlage heizt nicht: keine Einschaltanforderung.")
 
         room = float(observation.room_temp)
+        # One timer per heating run; never restart the deadline at every tick.
+        if room >= target_room_temp:
+            self.heatup_started_at = None
+        elif self.heatup_started_at is None or now < self.heatup_started_at:
+            self.heatup_started_at = now
+        self.heatup_elapsed_min = (
+            max(0.0, (now - self.heatup_started_at).total_seconds() / 60.0)
+            if self.heatup_started_at is not None else 0.0
+        )
         upper = float(target_room_temp) + float(max_overheat_k)
         lower = float(target_room_temp) - float(restart_delta_k)
         if room >= upper:
@@ -238,7 +252,7 @@ class RoomAutoController:
         # deshalb nicht automatisch heruntergeregelt werden.
         gap = float(target_room_temp) - room
         heating = gap >= 0.8
-        self.target_hz = max(startup if heating else preferred,
+        self.target_hz = max(preferred,
                              min(ceiling, self.target_hz))
 
         self.last_learned = self.continuity.observe(
@@ -292,6 +306,8 @@ class RoomAutoController:
         # overheat and rate-limit checks above have succeeded.
         plan = plan_room_demand(
             old_hz=old, actual_hz=actual_hz,
+            heatup_minutes=heatup_duration_min,
+            elapsed_heatup_min=self.heatup_elapsed_min,
             room_temp=room, room_target=target_room_temp,
             trend_kph=float(trend), preferred_hz=preferred, max_hz=ceiling,
             may_raise=(self.last_heat_raise is None
@@ -303,6 +319,9 @@ class RoomAutoController:
         self.demand_forecast_deficit_k = plan.forecast_deficit_k
         self.demand_aligned_to_actual = plan.aligned_to_actual
         self.demand_actual_hz_anchor = plan.actual_hz_anchor
+        self.demand_requested_rate_kph = plan.target_rate_kph
+        self.demand_rate_error_kph = plan.rate_error_kph
+        self.demand_remaining_heatup_min = plan.heatup_remaining_min
         if plan.heat_raise:
             self.last_heat_raise = now
         self.last_adjust = now

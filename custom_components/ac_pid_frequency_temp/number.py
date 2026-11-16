@@ -1,6 +1,7 @@
 """Zahlen-Entität: Ziel-Hz."""
 
 from __future__ import annotations
+from .const import CONF_ROOM_HEATUP_DURATION
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import EntityCategory
@@ -24,7 +25,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: AcPidFrequencyController = entry.runtime_data
-    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomStartHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller), BtContactTimeoutNumber(controller), RoomTrendWindowNumber(controller)])
+    async_add_entities([TargetHzNumber(controller), MqttIntervalNumber(controller), MqttQosNumber(controller), RoomTargetNumber(controller), RoomPreferredHzNumber(controller), RoomStartHzNumber(controller), RoomOverheatNumber(controller), RoomRestartDeltaNumber(controller), RoomWindowNumber(controller), RoomMaxHzNumber(controller), RoomMinHzGuardNumber(controller), SilentBoostMinutesNumber(controller), BtContactTimeoutNumber(controller), RoomTrendWindowNumber(controller), RoomHeatupDurationNumber(controller)])
 
 
 class TargetHzNumber(AcPidFrequencyEntity, NumberEntity):
@@ -255,3 +256,16 @@ class RoomTrendWindowNumber(RoomConfigNumber):
     _attr_native_step = 1
     def __init__(self, controller):
         super().__init__(controller, "room_trend_window")
+
+
+class RoomHeatupDurationNumber(RoomConfigNumber):
+    """Desired time from start of heating until room target (soft aim)."""
+    option_key = CONF_ROOM_HEATUP_DURATION
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:timer-sand"
+    _attr_native_unit_of_measurement = "min"
+    _attr_native_min_value = 60
+    _attr_native_max_value = 360
+    _attr_native_step = 15
+    def __init__(self, controller):
+        super().__init__(controller, "room_heatup_duration")
