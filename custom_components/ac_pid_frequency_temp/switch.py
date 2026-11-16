@@ -42,9 +42,7 @@ class EnabledSwitch(AcPidFrequencyEntity, SwitchEntity):
         cfg = self.controller.config
         if cfg[CONF_CONTROL_MODE] == MODE_ROOM_AUTO:
             room_id = cfg.get(CONF_ROOM_TEMP)
-            status, _age, _report = room_sensor_snapshot(
-                self.hass, room_id, float(cfg[CONF_ROOM_STALE])
-            )
+            status, _age, _report = self.controller.room_input_snapshot()
             if status != "ok":
                 raise HomeAssistantError(
                     f"Adaptive Raumregelung benötigt frische echte Raumdaten: {status}"
